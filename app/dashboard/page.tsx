@@ -6,8 +6,7 @@ import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+// Auth and profile are provided by `AuthProvider` via Supabase now.
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +34,7 @@ export default function DashboardPage() {
   }, [user, loading, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <div className="text-center w-full max-w-md">
         <Card className="p-6">
           <Spinner className="mx-auto mb-4 h-8 w-8" />

@@ -14,15 +14,22 @@ import {
   MessageSquare,
   Zap,
   Home,
+  TrendingUp,
+  Layers,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/types";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * Role-based sidebar navigation
  * Shows different menu items based on user role
  */
-export default function DashboardNav() {
+interface DashboardNavProps {
+  className?: string;
+}
+
+export default function DashboardNav({ className }: DashboardNavProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -52,15 +59,15 @@ export default function DashboardNav() {
 
     const roleMenus: Record<string, typeof baseItems> = {
       customer_service: [
+        // {
+        //   label: "Home",
+        //   href: `/dashboard/${user.role}/`,
+        //   icon: Home,
+        // },
         {
           label: "Home",
           href: `/dashboard/${user.role}/`,
           icon: Home,
-        },
-        {
-          label: "Create Order",
-          href: `/dashboard/${user.role}/create-order`,
-          icon: Zap,
         },
         {
           label: "Orders",
@@ -68,16 +75,33 @@ export default function DashboardNav() {
           icon: Package,
         },
         // {
-        //   label: "Customer Inquiries",
+        //   label: "Inquiries",
         //   href: `/dashboard/${user.role}/inquiries`,
         //   icon: MessageSquare,
         // },
       ],
       warehouse: [
         {
+          label: "Home",
+          href: `/dashboard/${user.role}/`,
+          icon: Warehouse,
+        },
+        // {
+        //   label: "Orders",
+        //   href: `/dashboard/${user.role}/orders`,
+        //   icon: Package,
+        // },
+        {
           label: "Inventory",
           href: `/dashboard/${user.role}/inventory`,
           icon: Warehouse,
+        },
+      ],
+      fom: [
+        {
+          label: "Home",
+          href: `/dashboard/${user.role}/`,
+          icon: Home,
         },
         {
           label: "Orders",
@@ -99,10 +123,20 @@ export default function DashboardNav() {
       ],
       admin: [
         {
-          label: "Dashboard",
+          label: "Overview",
           href: `/dashboard/${user.role}/overview`,
           icon: Package,
         },
+        {
+          label: "Orders",
+          href: `/dashboard/${user.role}/orders`,
+          icon: TrendingUp,
+        },
+        // {
+        //   label: "Merchants",
+        //   href: `/dashboard/${user.role}/merchants`,
+        //   icon: Layers,
+        // },
         {
           label: "Users",
           href: `/dashboard/${user.role}/users`,
@@ -123,7 +157,12 @@ export default function DashboardNav() {
   const menuItems = getMenuItems();
 
   return (
-    <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+    <aside
+      className={cn(
+        "w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-full",
+        className,
+      )}
+    >
       {/* Logo Section */}
       <div className="border-b border-sidebar-border p-6">
         <Link href="/dashboard" className="flex items-center gap-2">

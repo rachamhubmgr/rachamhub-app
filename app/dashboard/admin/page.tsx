@@ -1,115 +1,203 @@
-'use client';
+"use client";
 
-import { Card } from '@/components/ui/card';
-import { useAuth } from '@/lib/auth-context';
-import { Users, Package, Activity, BarChart3 } from 'lucide-react';
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
+import {
+  Users,
+  Package,
+  Activity,
+  BarChart3,
+  Loader2,
+  Layers,
+  Settings,
+} from "lucide-react";
+import { Order } from "@/lib/types";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [usersCount, setUsersCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    {
-      title: 'Total Users',
-      value: '45',
-      icon: Users,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-    },
-    {
-      title: 'Total Orders',
-      value: '892',
-      icon: Package,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-    },
-    {
-      title: 'System Health',
-      value: '98%',
-      icon: Activity,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-    },
-    {
-      title: 'Revenue',
-      value: '₦12.5M',
-      icon: BarChart3,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-    },
-  ];
+  useEffect(() => {
+    const fetchAdminMetrics = async () => {
+      setLoading(true);
+      const [{ data: orderData }, { data: userData }] = await Promise.all([
+        supabase!.from("orders").select("*"),
+        supabase!.from("users").select("id"),
+      ]);
+      setOrders((orderData ?? []) as Order[]);
+      setUsersCount((userData ?? []).length);
+      setLoading(false);
+    };
+
+    fetchAdminMetrics();
+
+    const channel = supabase!
+      .channel("admin-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        fetchAdminMetrics,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        fetchAdminMetrics,
+      )
+      .subscribe();
+
+    return () => {
+      supabase!.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Administration Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          Administration Dashboard
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Manage users, system settings, and view company-wide metrics
+          Manage users, system settings, and view company-wide metrics.
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map(stat => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.title} className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">{stat.title}</p>
-                  <p className="text-2xl font-bold text-foreground mt-2">{stat.value}</p>
-                </div>
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
+      {loading ? (
+        <Card className="p-6 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Loading admin metrics...
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Total Users
+                </p>
+                <p className="text-2xl font-bold text-foreground mt-2">
+                  {usersCount}
+                </p>
               </div>
-            </Card>
-          );
-        })}
-      </div>
+              <Users className="h-6 w-6 text-primary" />
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Total Orders
+                </p>
+                <p className="text-2xl font-bold text-foreground mt-2">
+                  {orders.length}
+                </p>
+              </div>
+              <Package className="h-6 w-6 text-secondary" />
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  System Health
+                </p>
+                <p className="text-2xl font-bold text-foreground mt-2">Live</p>
+              </div>
+              <Activity className="h-6 w-6 text-emerald-500" />
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Revenue
+                </p>
+                <p className="text-2xl font-bold text-foreground mt-2">
+                  ₦
+                  {orders
+                    .reduce((sum, order) => sum + Number(order.total_amount), 0)
+                    .toLocaleString()}
+                </p>
+              </div>
+              <BarChart3 className="h-6 w-6 text-green-600" />
+            </div>
+          </Card>
+        </div>
+      )}
 
-      {/* Admin Functions */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Administrative Tools</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">
+          Administrative Tools
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">User Management</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add, edit, and manage user accounts and roles
-            </p>
-          </div>
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">System Settings</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configure system parameters and integrations
-            </p>
-          </div>
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">Activity Logs</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              View system audit logs and user activities
-            </p>
-          </div>
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">Reports & Analytics</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Generate comprehensive system reports
-            </p>
-          </div>
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">Backup & Recovery</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage system backups and data recovery
-            </p>
-          </div>
-          <div className="p-4 border border-border rounded-lg hover:bg-accent/50 cursor-pointer transition">
-            <h3 className="font-medium text-foreground">Security Settings</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configure authentication and access control
-            </p>
-          </div>
+          <Link
+            href="/dashboard/admin/orders"
+            className="block p-4 border border-border rounded-lg hover:bg-accent/50 transition"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-foreground">
+                  Order Master Table
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  View all orders, delete records, and export reports.
+                </p>
+              </div>
+              <Layers className="h-6 w-6 text-primary" />
+            </div>
+          </Link>
+          <Link
+            href="/dashboard/admin/settings"
+            className="block p-4 border border-border rounded-lg hover:bg-accent/50 transition"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-foreground">
+                  Merchant Management
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Add, rename, and deactivate merchant records.
+                </p>
+              </div>
+              <Settings className="h-6 w-6 text-secondary" />
+            </div>
+          </Link>
+          <Link
+            href="/dashboard/admin/users"
+            className="block p-4 border border-border rounded-lg hover:bg-accent/50 transition"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-foreground">User Management</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage accounts, roles, and access status.
+                </p>
+              </div>
+              <Users className="h-6 w-6 text-emerald-500" />
+            </div>
+          </Link>
+          <Link
+            href="/dashboard/admin/settings"
+            className="block p-4 border border-border rounded-lg hover:bg-accent/50 transition"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-foreground">System Settings</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Configure order prefixes, timeouts, and FOM names.
+                </p>
+              </div>
+              <Activity className="h-6 w-6 text-slate-600" />
+            </div>
+          </Link>
         </div>
       </Card>
     </div>

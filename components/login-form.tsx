@@ -36,7 +36,7 @@ export default function LoginForm() {
         return;
       }
 
-      // Sign in with Firebase
+      // Sign in with Supabase
       await signIn(email, password);
 
       // Redirect to dashboard (will be determined by role in protected route)

@@ -73,6 +73,7 @@ RachamHub is a production-ready logistics management system for Lagos-based oper
 ### Step 2: Verify API Access
 
 Make sure the Gemini API is enabled in your Google Cloud Console:
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Search for **"Generative Language API"**
 3. Click **Enable** if not already enabled
@@ -148,7 +149,7 @@ service cloud.firestore {
       allow read: if request.auth.uid == userId;
       allow write: if request.auth.uid == userId && request.auth != null;
     }
-    
+
     // Orders can be read by authenticated users
     match /orders/{orderId} {
       allow read: if request.auth != null;
@@ -229,15 +230,15 @@ For each user created in Firebase Auth:
 
 RachamHub has the following roles with specific permissions:
 
-| Role | Description | Features |
-|------|-------------|----------|
-| **customer_service** | Customer Service Representative | Orders, Order Extraction (AI), Inquiries |
-| **warehouse** | Warehouse Manager | Inventory Management, Stock Tracking |
-| **fom1** | Fulfillment Operations Manager Level 1 | Order Fulfillment, Status Updates |
-| **fom2** | Fulfillment Operations Manager Level 2 | Same as FOM1 |
-| **fom3** | Fulfillment Operations Manager Level 3 | Same as FOM1 |
-| **accounting** | Accounting Staff | Invoices, Payments, Reports |
-| **admin** | System Administrator | User Management, Settings, System Logs |
+| Role                 | Description                            | Features                                 |
+| -------------------- | -------------------------------------- | ---------------------------------------- |
+| **customer_service** | Customer Service Representative        | Orders, Order Extraction (AI), Inquiries |
+| **warehouse**        | Warehouse Manager                      | Inventory Management, Stock Tracking     |
+| **fom1**             | Fulfillment Operations Manager Level 1 | Order Fulfillment, Status Updates        |
+| **fom2**             | Fulfillment Operations Manager Level 2 | Same as FOM1                             |
+| **fom3**             | Fulfillment Operations Manager Level 3 | Same as FOM1                             |
+| **accounting**       | Accounting Staff                       | Invoices, Payments, Reports              |
+| **admin**            | System Administrator                   | User Management, Settings, System Logs   |
 
 ---
 
@@ -257,6 +258,7 @@ RachamHub has the following roles with specific permissions:
 ### 2. Role-Based Dashboards
 
 Each role has a dedicated dashboard with relevant metrics and quick actions:
+
 - **Customer Service**: Orders, extractions, inquiries
 - **Warehouse**: Inventory, stock levels, receiving
 - **FOM1/2/3**: Fulfillment operations, status tracking
@@ -293,7 +295,8 @@ Each role has a dedicated dashboard with relevant metrics and quick actions:
 
 ### Issue: "Order extraction fails"
 
-**Solution**: 
+**Solution**:
+
 - Check that the Gemini API is enabled in Google Cloud Console
 - Verify your API key is valid
 - Try with clearer order information
@@ -376,6 +379,7 @@ RachamHub/
 ## Contact & Support
 
 For support or issues, please contact the development team or refer to:
+
 - [Firebase Documentation](https://firebase.google.com/docs)
 - [Google Gemini API Docs](https://ai.google.dev/docs)
 - [Next.js Documentation](https://nextjs.org/docs)

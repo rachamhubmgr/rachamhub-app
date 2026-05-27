@@ -1,22 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  onAuthStateChanged,
-  signOut as firebaseSignOut,
-  User as FirebaseUser,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
-import {
-  getDoc,
-  doc,
-  setDoc,
-  serverTimestamp,
-  onSnapshot,
-} from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { AuthUser, FirestoreUser, UserRole } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
+import { AuthUser, UserProfile, UserRole } from "@/lib/types";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -40,30 +26,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch user details from Firestore
+  // Fetch user details from Supabase `users` table
   const fetchUserDetails = async (
-    firebaseUser: FirebaseUser,
-  ): Promise<FirestoreUser | null> => {
-    if (!db) {
-      console.warn(
-        "[Auth] Firestore not initialized - returning null from fetchUserDetails",
-      );
+    supaUserId: string,
+  ): Promise<UserProfile | null> => {
+    if (!supabase) {
+      console.warn("[Auth] Supabase client is not initialized.");
       return null;
     }
 
     try {
-      const userDocRef = doc(db, "users", firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", supaUserId)
+        .maybeSingle();
 
-      if (!userDoc.exists()) {
-        console.warn(
-          `[Auth] User document not found for UID: ${firebaseUser.uid}`,
-        );
+      if (error) {
+        console.error("[Auth] Error fetching user details:", error);
         return null;
       }
 
-      return userDoc.data() as FirestoreUser;
+      if (!data) return null;
+
+      // Map Supabase row to UserProfile shape
+      const row = data as any;
+      const mapped: UserProfile = {
+        uid: row.id,
+        email: row.email || "",
+        displayName: row.display_name || row.displayName || "User",
+        role: row.role || ("customer_service" as UserRole),
+        isActive: typeof row.is_active === "boolean" ? row.is_active : true,
+        createdAt: row.created_at || new Date().toISOString(),
+        updatedAt: row.updated_at || new Date().toISOString(),
+        lastLogin: row.last_login || undefined,
+      };
+
+      return mapped;
     } catch (err: any) {
       console.error("[Auth] Error fetching user details:", err);
       return null;
@@ -71,128 +70,133 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Convert Firestore user to Auth context user
-  const createAuthUser = (firestoreUser: FirestoreUser): AuthUser => ({
-    ...firestoreUser,
+  const createAuthUser = (UserProfile: UserProfile): AuthUser => ({
+    ...UserProfile,
     isLoading: false,
     error: null,
   });
 
   // Initialize auth listener
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
+    let profileSubscription: any = null;
 
-    let unsubscribeProfile: (() => void) | null = null;
-    let lastLoginUpdated = false;
-
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Clean up previous profile listener if user changes
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = null;
+    const init = async () => {
+      setLoading(true);
+      if (!supabase) {
+        setUser(null);
+        setLoading(false);
+        return;
       }
 
-      lastLoginUpdated = false;
-      if (firebaseUser) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData?.session?.user ?? null;
+
+      if (!currentUser) {
+        setUser(null);
+        setLoading(false);
+      } else {
         setError(null);
+        const profile = await fetchUserDetails(currentUser.id);
+        if (profile) setUser(createAuthUser(profile));
 
-        if (db) {
-          const userDocRef = doc(db!, "users", firebaseUser.uid);
-
-          // Use a real-time listener. This is resilient to offline states.
-          unsubscribeProfile = onSnapshot(
-            userDocRef,
-            (userDoc) => {
-              const data = userDoc.data();
-              if (userDoc.exists() && data && "role" in data) {
-                setUser(createAuthUser(data as FirestoreUser));
-                setError(null);
-
-                // Update last login (once per session)
-                if (!lastLoginUpdated) {
-                  lastLoginUpdated = true;
-                  setDoc(
-                    userDocRef,
-                    { lastLogin: serverTimestamp() },
-                    { merge: true },
-                  ).catch((err) =>
-                    console.warn("[Auth] lastLogin update failed:", err),
-                  );
+        // subscribe to realtime changes for this user's row
+        try {
+          profileSubscription = supabase
+            .channel(`user-profile-${currentUser.id}`)
+            .on(
+              "postgres_changes",
+              {
+                event: "*",
+                schema: "public",
+                table: "users",
+                filter: `id=eq.${currentUser.id}`,
+              },
+              (payload) => {
+                if (payload.eventType === "DELETE") {
+                  setUser(null);
+                } else if (
+                  payload.eventType === "INSERT" ||
+                  payload.eventType === "UPDATE"
+                ) {
+                  const newData = payload.new as any;
+                  if (newData)
+                    setUser(
+                      createAuthUser({
+                        uid: newData.id,
+                        email: newData.email || "",
+                        displayName:
+                          newData.display_name || newData.displayName || "User",
+                        role: newData.role || ("customer_service" as UserRole),
+                        isActive:
+                          typeof newData.is_active === "boolean"
+                            ? newData.is_active
+                            : true,
+                        createdAt:
+                          newData.created_at || new Date().toISOString(),
+                        updatedAt:
+                          newData.updated_at || new Date().toISOString(),
+                        lastLogin: newData.last_login || undefined,
+                      } as UserProfile),
+                    );
                 }
-              } else if (!userDoc.exists()) {
-                setError("User profile not found.");
-                setUser(null);
-              }
-              setLoading(false);
-            },
-            (err) => {
-              console.error("[Auth] Profile listener error:", err);
-              if (err.code !== "unavailable") setError(err.message);
-              setError(null);
-              setLoading(false);
-            },
-          );
-        } else {
-          // No Firestore available — use minimal Auth-derived profile
-          const fallback: FirestoreUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "User",
-            role: "customer_service",
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setUser(createAuthUser(fallback));
+                setLoading(false);
+              },
+            )
+            .subscribe();
+        } catch (err) {
+          console.warn("[Auth] Could not subscribe to profile realtime", err);
         }
 
         setLoading(false);
-      } else {
-        // User is signed out
-        setUser(null);
-        setLoading(false);
       }
-    });
+    };
+
+    init();
+
+    let authListener: any = null;
+    if (supabase) {
+      authListener = supabase.auth.onAuthStateChange((event, session) => {
+        const supaUser = session?.user ?? null;
+
+        if (!supaUser) {
+          setUser(null);
+          setLoading(false);
+        } else {
+          // fetch profile and let realtime subscription callback update it
+          fetchUserDetails(supaUser.id).then((profile) => {
+            if (profile) setUser(createAuthUser(profile));
+          });
+        }
+      });
+    }
 
     return () => {
-      unsubscribeAuth();
-      if (unsubscribeProfile) unsubscribeProfile();
+      // cleanup auth listener and profile subscription
+      authListener?.subscription?.unsubscribe?.();
+      if (profileSubscription && supabase)
+        supabase.removeChannel(profileSubscription);
     };
   }, []);
 
-  useEffect(() => {
-    console.log("[Auth] Auth state changed:", {
-      user,
-      loading,
-      error,
-    });
-  }, [user, loading, error]);
-
   const signIn = async (email: string, password: string) => {
     try {
+      if (!supabase) throw new Error("Supabase client is not initialized.");
       setError(null);
       setLoading(true);
-
-      const credential = await signInWithEmailAndPassword(
-        auth!,
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      );
+      });
+      if (error) throw error;
 
-      // Fetch fresh user profile immediately after sign-in
-      const firebaseUser = credential.user || auth!.currentUser;
-      if (firebaseUser) {
-        const userDetails = await fetchUserDetails(firebaseUser);
-
-        if (userDetails) {
-          setUser(createAuthUser(userDetails));
-        } else {
-          // If no Firestore profile, clear user and inform
+      const supaUser = data.user;
+      if (supaUser) {
+        const userDetails = await fetchUserDetails(supaUser.id);
+        if (userDetails) setUser(createAuthUser(userDetails));
+        else {
           setUser(null);
           setError("User profile not found. Please contact administrator.");
-          await firebaseSignOut(auth!);
+          await supabase.auth.signOut();
           throw new Error("User profile not found");
         }
       }
@@ -211,36 +215,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     displayName: string,
     role: UserRole,
   ) => {
-    if (!db) {
-      throw new Error("Database not initialized");
-    }
-
     try {
+      if (!supabase) throw new Error("Supabase client is not initialized.");
       setError(null);
       setLoading(true);
+      // Create Supabase Auth user
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
 
-      // Create Firebase Auth account
-      const credential = await createUserWithEmailAndPassword(
-        auth!,
-        email,
-        password,
-      );
-
-      // Create Firestore user document
+      const supaUser = data.user;
+      // Create profile row in `users` table
       const now = new Date().toISOString();
-      const userDocument: FirestoreUser = {
-        uid: credential.user.uid,
+      const userDocument: any = {
+        id: supaUser?.id || undefined,
         email,
-        displayName,
+        display_name: displayName,
         role,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
       };
 
-      await setDoc(doc(db!, "users", credential.user.uid), userDocument);
+      if (supaUser?.id) {
+        const { error: insertErr } = await supabase
+          .from("users")
+          .insert([userDocument]);
+        if (insertErr) throw insertErr;
+      }
 
-      setUser(createAuthUser(userDocument));
+      if (supaUser) {
+        const mapped: UserProfile = {
+          uid: supaUser.id,
+          email,
+          displayName,
+          role,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+        setUser(createAuthUser(mapped));
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign up failed";
       setError(message);
@@ -252,8 +266,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (!supabase) throw new Error("Supabase client is not initialized.");
       setError(null);
-      await firebaseSignOut(auth!);
+      await supabase.auth.signOut();
       setUser(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign out failed";
@@ -264,12 +279,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      if (!auth!.currentUser) {
+      if (!supabase) {
+        setUser(null);
+        return;
+      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const supaUser = sessionData?.session?.user ?? null;
+      if (!supaUser) {
         setUser(null);
         return;
       }
 
-      const userDetails = await fetchUserDetails(auth!.currentUser);
+      const userDetails = await fetchUserDetails(supaUser.id);
       if (userDetails) {
         setUser(createAuthUser(userDetails));
       }

@@ -12,20 +12,20 @@ Get RachamHub up and running in 5 minutes!
 
 ```bash
 pnpm install
+
+or
+
+npm install
 ```
 
-## Step 2: Get Firebase Credentials (2 minutes)
+## Step 2: Get Supabase Credentials (2 minutes)
 
-1. Go to [Firebase Console](https://console.firebase.google.com)
+1. Go to [Supabase](https://app.supabase.com)
 2. Create a new project named "RachamHub"
-3. Go to **Project Settings** → Copy your config:
+3. In Project Settings → API, copy your:
    ```
-   - apiKey
-   - authDomain
-   - projectId
-   - storageBucket
-   - messagingSenderId
-   - appId
+   - URL
+   - anon key
    ```
 
 ## Step 3: Get Gemini API Key (1 minute)
@@ -39,32 +39,28 @@ pnpm install
 Create `.env.local` in the project root:
 
 ```env
-NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_ANON_KEY
 GOOGLE_GEMINI_API_KEY=YOUR_GEMINI_KEY
 ```
 
-## Step 5: Enable Firebase Features (1 minute)
+## Step 5: Enable Supabase Features (1 minute)
 
-In Firebase Console:
+In Supabase Console:
 
 1. **Authentication** → Enable "Email/Password"
-2. **Firestore** → Create database in test mode
-3. Create collections: `users` and `orders`
+2. **Database** → Create tables `users` and `orders`
+3. Allow the app to use row-level security later once your tables are ready
 
 ## Step 6: Create a Test User
 
-In Firebase Console → Authentication:
+In Supabase Console → Authentication:
 
-1. Click **Add user**
+1. Click **Users** → **New user**
 2. Email: `demo@rachamhub.com`
 3. Password: `Demo123!`
 
-Then create a Firestore document in `users` collection:
+Then insert a row into the `users` table with matching profile data:
 
 ```json
 {
@@ -85,6 +81,7 @@ pnpm dev
 ```
 
 Visit `http://localhost:3000` and login with:
+
 - Email: `demo@rachamhub.com`
 - Password: `Demo123!`
 
@@ -103,23 +100,26 @@ You now have a fully functional RachamHub instance!
 
 Try these role combinations for a complete demo:
 
-| Role | Test User | Features |
-|------|-----------|----------|
-| Customer Service | cs@rachamhub.com | Orders, AI extraction |
-| Warehouse | warehouse@rachamhub.com | Inventory management |
-| FOM1 | fom@rachamhub.com | Order fulfillment |
-| Accounting | accounting@rachamhub.com | Invoices, payments |
-| Admin | admin@rachamhub.com | User management |
+| Role             | Test User                | Features              |
+| ---------------- | ------------------------ | --------------------- |
+| Customer Service | cs@rachamhub.com         | Orders, AI extraction |
+| Warehouse        | warehouse@rachamhub.com  | Inventory management  |
+| FOM1             | fom@rachamhub.com        | Order fulfillment     |
+| Accounting       | accounting@rachamhub.com | Invoices, payments    |
+| Admin            | admin@rachamhub.com      | User management       |
 
 ## Common Issues
 
 **Error: "Missing environment variables"**
-- ✓ Ensure `.env.local` exists with all Firebase variables
+
+- ✓ Ensure `.env.local` exists with Supabase URL and anon key
 
 **Error: "User profile not found"**
-- ✓ Create matching Firestore document with same UID as Firebase Auth user
+
+- ✓ Create matching row in the `users` table with the Supabase user ID
 
 **Gemini extraction not working**
+
 - ✓ Verify `GOOGLE_GEMINI_API_KEY` is set and valid
 
 ## Architecture
@@ -127,26 +127,26 @@ Try these role combinations for a complete demo:
 ```
 RachamHub
 ├── Login Page
-│   └── Firebase Auth (email/password)
+│   └── Supabase Auth (email/password)
 ├── Dashboard Router
 │   └── Role-based redirection
 ├── Role Dashboards
 │   ├── Customer Service (orders, extraction)
 │   ├── Warehouse (inventory)
-│   ├── FOM1/2/3 (fulfillment)
+│   ├── FOM (fulfillment)
 │   ├── Accounting (invoicing)
 │   └── Admin (management)
-└── Firestore Database
-    ├── users collection
-    └── orders collection
+└── Supabase Database
+    ├── users table
+    └── orders table
 ```
 
 ## Key Features
 
-🔐 **Secure Authentication** - Firebase Auth
+🔐 **Secure Authentication** - Supabase Auth
 📱 **Mobile Responsive** - Works on all devices
 ⚡ **AI Powered** - Google Gemini extraction
-🔄 **Real-time** - Firestore listeners
+🔄 **Real-time** - PostgreSQL + Supabase Realtime
 🎯 **Role-Based** - 7 different roles
 🎨 **Lagos Theme** - Green, Yellow, Black
 

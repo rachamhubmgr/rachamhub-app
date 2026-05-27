@@ -62,7 +62,7 @@ Seven specialized dashboards for different user roles:
 
 ## 📁 Project Structure
 
-```
+````
 rachamhub/
 ├── app/
 │   ├── api/
@@ -87,232 +87,118 @@ rachamhub/
 │   ├── globals.css                  # Global styles + theme
 │   └── layout.tsx                   # Root layout
 ├── lib/
-│   ├── firebase.ts                  # Firebase initialization
-│   ├── auth-context.tsx             # Auth provider & hooks
-│   └── types.ts                     # TypeScript types
-├── components/
-│   └── protected-route.tsx          # Route protection
-└── SETUP_GUIDE.md                   # Detailed setup instructions
+│   ├── supabase.ts                 # Supabase client
+# RachamHub - Lagos Logistics Management System
+
+Lightweight Next.js app for logistics operations with Supabase and Google Gemini.
+
+Overview
+--------
+RachamHub provides role-based dashboards, AI-powered order extraction, and real-time updates using Supabase (Postgres + Realtime).
+
+Highlights
+----------
+- Role-based access for Customer Service, Warehouse, FOM, Accounting, and Admin
+- AI order extraction via Google Gemini API
+- Real-time data via Supabase Realtime (Postgres logical replication)
+- Auth via Supabase Auth and profile rows in `public.users`
+
+Tech Stack
+----------
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS + shadcn/ui
+- Supabase (Auth, Postgres, Realtime)
+- Google Gemini (AI extraction)
+
+Quick Start
+-----------
+1. Install dependencies
+
+```bash
+pnpm install
+````
+
+2. Copy env template and add keys
+
+```bash
+cp .env.local.example .env.local
+# set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY and GOOGLE_GEMINI_API_KEY
 ```
 
-## 🔧 Setup Instructions
+3. Run dev server
 
-### Quick Start
+```bash
+pnpm dev
+```
 
-1. **Install Dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-2. **Configure Environment Variables**
-
-   ```bash
-   cp .env.local.example .env.local
-   # Edit .env.local with your Firebase and Gemini credentials
-   ```
-
-3. **Start Development Server**
-
-   ```bash
-   pnpm dev
-   ```
-
-4. **Access the Application**
-   - Open http://localhost:3000
-   - You'll be redirected to login
-
-### Detailed Setup
-
-For complete Firebase and Gemini setup instructions, see [SETUP_GUIDE.md](./SETUP_GUIDE.md)
-
-## 🔑 Environment Variables
+## Environment variables
 
 ```env
-# Firebase
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_bucket.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-
-# Google Gemini AI
-GOOGLE_GEMINI_API_KEY=your_gemini_api_key
+NEXT_PUBLIC_SUPABASE_URL=https://xyz.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=public-anon-key
+GOOGLE_GEMINI_API_KEY=your_gemini_key
 ```
 
-## 👥 User Roles
+## Database setup
 
-### Customer Service (customer_service)
+Run `sql/supabase-init.sql` in the Supabase SQL editor to create `users` and `orders` tables, RLS (development-friendly), triggers, and demo data. After creating Auth users in Supabase, ensure profile rows in `public.users` match Auth user `id` values.
 
-- View and manage orders
-- Extract orders using AI
-- Handle customer inquiries
-- Dashboard: `/dashboard/customer_service`
+## Where to look
 
-### Warehouse (warehouse)
+- Auth context: `lib/auth-context.tsx` (uses Supabase)
+- Supabase client: `lib/supabase.ts`
+- Order extraction: `components/order-extraction-form.tsx` and `/api/gemini/extract-order`
 
-- Inventory management
-- Stock tracking
-- Receiving operations
-- Dashboard: `/dashboard/warehouse`
+## Test Different Roles
 
-### FOM Levels (fom1, fom2, fom3)
+Try these role combinations for a complete demo:
 
-- Order fulfillment operations
-- Status tracking
-- Escalation handling
-- Dashboard: `/dashboard/fom`
+| Role             | Test User                | Features              |
+| ---------------- | ------------------------ | --------------------- |
+| Customer Service | cs@rachamhub.com         | Orders, AI extraction |
+| Warehouse        | warehouse@rachamhub.com  | Inventory management  |
+| FOM              | fom@rachamhub.com        | Order fulfillment     |
+| Accounting       | accounting@rachamhub.com | Invoices, payments    |
+| Admin            | admin@rachamhub.com      | User management       |
 
-### Accounting (accounting)
+_user table fields_
 
-- Invoice management
-- Payment tracking
-- Financial reports
-- Dashboard: `/dashboard/accounting`
+| Field       | Type                                                    |
+| ----------- | ------------------------------------------------------- |
+| uid         | string                                                  |
+| email       | string                                                  |
+| displayName | string                                                  |
+| role        | customer_service / warehouse / fom / accounting / admin |
+| isActive    | boolean                                                 |
+| createdAt   | timestamp                                               |
+| updatedAt   | timestamp                                               |
 
-### Administrator (admin)
+## Documentation
 
-- User management
-- System settings
-- Audit logs
-- Dashboard: `/dashboard/admin`
+This repo previously included several markdown guides. Primary docs now are:
 
-## 🎨 Design System
+- `README.md` (this file)
+- `ARCHITECTURE.md` (system architecture)
+- `sql/supabase-init.sql` (DB schema + demo data)
 
-### Colors (Lagos Theme)
+If you need the previous detailed setup guides converted into the new Supabase flow, I can add a condensed `SETUP.md`.
 
-- **Primary (Green)**: `#1B7A3E` - Brand color
-- **Secondary (Yellow)**: `#FCD34D` - Accent/highlight
-- **Neutral**: Black, White, and Grays
+## Contributing
 
-### Typography
+Create a branch, add tests where applicable, and open a PR to `main`.
 
-- **Headings**: Geist (system font)
-- **Body**: Geist (system font)
-- **Monospace**: Geist Mono
+## Support
 
-### Responsive Design
+If something breaks during the migration to Supabase, check:
 
-- Mobile-first approach
-- Breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
-- Touch-friendly interface elements
-
-## 🔐 Security Features
-
-- Firebase authentication with secure session management
-- Type-safe TypeScript for compile-time safety
-- Environment variable protection for sensitive data
-- Firestore security rules for data access control
-- Protected routes with role-based access
-
-## 🚀 Deployment
-
-### Deploy to Vercel (Recommended)
-
-```bash
-# Connect to GitHub
-git push origin main
-
-# Vercel will automatically deploy
-# Add environment variables in Vercel project settings
-```
-
-### Deploy to Other Platforms
-
-The app works with any Node.js hosting (AWS, GCP, etc.):
-
-1. Set all environment variables
-2. Build: `pnpm build`
-3. Start: `pnpm start`
-
-## 📱 Browser Support
-
-- Chrome/Edge 90+
-- Firefox 88+
-- Safari 14+
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## 🐛 Troubleshooting
-
-### "Firebase config is missing"
-
-- Ensure `.env.local` has all `NEXT_PUBLIC_FIREBASE_*` variables
-
-### "User profile not found"
-
-- Create a Firestore document in the `users` collection with matching Firebase UID
-
-### "Gemini API key not configured"
-
-- Set `GOOGLE_GEMINI_API_KEY` in `.env.local`
-
-### "Cannot extract order"
-
-- Verify Gemini API is enabled in Google Cloud Console
-- Try with clearer order information
-
-## 📚 Additional Resources
-
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [Google Gemini API](https://ai.google.dev)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com)
-- [shadcn/ui Components](https://ui.shadcn.com)
-
-## 📄 License
-
-This project is proprietary software for RachamHub Nigeria.
-
-## 👨‍💻 Development
-
-### Available Scripts
-
-```bash
-# Start dev server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
-
-# Run linting
-pnpm lint
-
-# Type checking
-pnpm type-check
-```
-
-### Code Structure
-
-- **Server Components**: Used by default in App Router
-- **Client Components**: Marked with `'use client'` where needed
-- **Custom Hooks**: In `/lib` directory
-- **Components**: Reusable UI components in `/components`
-
-## 🤝 Contributing
-
-For internal development, follow the established patterns:
-
-1. Create feature branches from `main`
-2. Use TypeScript throughout
-3. Follow the existing component structure
-4. Test across mobile and desktop
-5. Create pull request with description
-
-## 📞 Support
-
-For issues or questions:
-
-1. Check the SETUP_GUIDE.md
-2. Review browser console for errors
-3. Check Firebase console for auth/database issues
-4. Contact the development team
+- `NEXT_PUBLIC_SUPABASE_...` variables
+- Supabase Auth users exist for demo emails
+- The `public.users` rows match Auth user ids
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2024  
-**Made with ❤️ for RachamHub Nigeria**
+Version: 1.0.0
+Last Updated: 2026-05-25
+
+- Dashboard: `/dashboard/admin`

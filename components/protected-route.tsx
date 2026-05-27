@@ -46,7 +46,7 @@ export default function ProtectedRoute({
   if (loading) {
     return (
       fallback || (
-        <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
           <div className="text-center">
             <Spinner className="mx-auto mb-4 h-8 w-8" />
             <p className="text-sm text-muted-foreground">Loading...</p>

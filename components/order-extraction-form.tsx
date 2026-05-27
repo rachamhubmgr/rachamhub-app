@@ -1,24 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { ExtractedOrder, GeminiResponse } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
+import { AlertCircle, CheckCircle2, Loader2, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/lib/auth-context";
-import { ExtractedOrder, GeminiResponse } from "@/lib/types";
-import { AlertCircle, CheckCircle2, Loader2, Save, Upload } from "lucide-react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 
 export default function OrderExtractionForm() {
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [extractedData, setExtractedData] = useState<ExtractedOrder | null>(
-    null,
-  );
+  const [reviewData, setReviewData] = useState<ExtractedOrder | null>(null);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  const [orderPrefix, setOrderPrefix] = useState("RCH-");
   const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      if (!supabase) return;
+
+      const [{ data: merchantsData }, { data: settingsData }] =
+        await Promise.all([
+          supabase.from("merchants").select("name").eq("is_active", true),
+          supabase
+            .from("settings")
+            .select("key, value")
+            .in("key", ["order_prefix"]),
+        ]);
+
+      if (merchantsData) {
+        setMerchantOptions(
+          merchantsData.map((row: any) => row.name).filter(Boolean),
+        );
+      }
+
+      if (settingsData) {
+        const prefixRow = settingsData.find(
+          (row: any) => row.key === "order_prefix",
+        );
+        if (prefixRow?.value) {
+          setOrderPrefix(prefixRow.value);
+        }
+      }
+    };
+
+    fetchConfig();
+  }, []);
 
   const extractOrderFromText = async () => {
     setError(null);
@@ -31,8 +71,6 @@ export default function OrderExtractionForm() {
         setIsLoading(false);
         return;
       }
-
-      console.log("[v0] Calling Gemini API for order extraction...");
 
       // Call Gemini API via route handler
       const response = await fetch("/api/gemini/extract-order", {
@@ -52,8 +90,8 @@ export default function OrderExtractionForm() {
         throw new Error(result.error || "No order data extracted");
       }
 
-      console.log("[v0] Extracted order data:", result.data);
-      setExtractedData(result.data);
+      setReviewData(result.data);
+      setIsReviewOpen(true);
       setSuccess(false);
     } catch (err) {
       const message =
@@ -66,36 +104,40 @@ export default function OrderExtractionForm() {
   };
 
   const saveExtractedOrder = async () => {
-    if (!extractedData || !user) return;
+    const orderToSave = reviewData;
+    if (!orderToSave || !user) return;
 
     setError(null);
     setIsLoading(true);
 
     try {
-      console.log("[v0] Saving extracted order to Firestore...");
+      if (!supabase) throw new Error("Supabase client is not initialized.");
+      console.log("Saving extracted order to Supabase...");
 
-      // Save to Firestore
-      const ordersRef = collection(db!, "orders");
       const orderData = {
-        customerId: extractedData.customerId,
-        customerName: extractedData.customerName,
-        items: extractedData.items,
-        totalAmount: extractedData.totalAmount,
-        status: "pending" as const,
-        notes: extractedData.notes,
-        extractedBy: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+        customer_name: orderToSave.customerName,
+        delivery_address: orderToSave.deliveryAddress,
+        phone_numbers: orderToSave.phoneNumbers,
+        merchant: orderToSave.merchant,
+        cc_comment: orderToSave.comment,
+        items: orderToSave.items,
+        total_amount: orderToSave.totalAmount,
+        delivery_status: "pending",
+        inventory_status: "unpacked",
+        extracted_by: user.uid,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any;
 
-      await addDoc(ordersRef, orderData);
+      const { error } = await supabase.from("orders").insert([orderData]);
+      if (error) throw error;
 
-      console.log("[v0] Order saved successfully");
+      console.log("Order saved successfully");
       setSuccess(true);
+      setIsReviewOpen(false);
+      setReviewData(null);
       setText("");
-      setExtractedData(null);
 
-      // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       const message =
@@ -105,6 +147,23 @@ export default function OrderExtractionForm() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const updateReviewField = (key: keyof ExtractedOrder, value: any) => {
+    setReviewData((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [key]: value } as ExtractedOrder;
+    });
+  };
+
+  const updateReviewItem = (index: number, key: string, value: any) => {
+    setReviewData((prev) => {
+      if (!prev) return prev;
+      const items = prev.items.map((it, i) =>
+        i === index ? { ...it, [key]: value } : it,
+      );
+      return { ...prev, items } as ExtractedOrder;
+    });
   };
 
   return (
@@ -177,107 +236,34 @@ export default function OrderExtractionForm() {
         </Card>
       )}
 
-      {/* Extracted Data Preview */}
-      {extractedData && (
-        <Card className="p-6 bg-accent/5 border-primary/20">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Extracted Order Details
-          </h2>
-
-          <div className="space-y-4">
-            {/* Customer Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Customer Name
-                </label>
-                <p className="text-foreground font-medium">
-                  {extractedData.customerName}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Customer ID
-                </label>
-                <p className="text-foreground font-medium">
-                  {extractedData.customerId}
-                </p>
-              </div>
-            </div>
-
-            {/* Items Table */}
+      {/* Extracted Data Review */}
+      {reviewData && (
+        <Card className="space-y-6 border bg-background shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-muted/20 bg-muted px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Order Items
-              </label>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-border">
-                    <tr>
-                      <th className="text-left py-2 text-xs font-semibold text-muted-foreground">
-                        Item Name
-                      </th>
-                      <th className="text-left py-2 text-xs font-semibold text-muted-foreground">
-                        Quantity
-                      </th>
-                      <th className="text-left py-2 text-xs font-semibold text-muted-foreground">
-                        Weight
-                      </th>
-                      <th className="text-left py-2 text-xs font-semibold text-muted-foreground">
-                        Dimensions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {extractedData.items.map((item, idx) => (
-                      <tr key={idx} className="border-b border-border/50">
-                        <td className="py-3 text-foreground">{item.name}</td>
-                        <td className="py-3 text-foreground">
-                          {item.quantity}
-                        </td>
-                        <td className="py-3 text-foreground">
-                          {item.weight || "—"}
-                        </td>
-                        <td className="py-3 text-foreground">
-                          {item.dimensions || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <p className="text-lg font-semibold text-foreground">
+                Review extracted order
+              </p>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Verify and update the AI extraction before submitting the order.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Order number prefix:{" "}
+                <span className="font-medium">{orderPrefix}</span>
+              </p>
             </div>
-
-            {/* Total Amount */}
-            <div className="pt-4 border-t border-border">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Total Amount
-                </span>
-                <span className="text-2xl font-bold text-primary">
-                  ₦{extractedData.totalAmount.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            {/* Notes */}
-            {extractedData.notes && (
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Notes
-                </label>
-                <p className="text-sm text-foreground bg-background/50 p-3 rounded border border-border">
-                  {extractedData.notes}
-                </p>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-border">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setReviewData(null)}
+                disabled={isLoading}
+              >
+                Clear review
+              </Button>
               <Button
                 onClick={saveExtractedOrder}
+                className="bg-primary hover:bg-primary/90"
                 disabled={isLoading}
-                className="bg-primary hover:bg-primary/90 flex-1"
               >
                 {isLoading ? (
                   <>
@@ -285,22 +271,190 @@ export default function OrderExtractionForm() {
                     Saving...
                   </>
                 ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Order
-                  </>
+                  "Submit Order"
                 )}
               </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-6 px-6 pb-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Customer Name
+                </label>
+                <Input
+                  value={reviewData.customerName ?? ""}
+                  onChange={(e) =>
+                    updateReviewField("customerName", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Phone Numbers
+                </label>
+                <Textarea
+                  value={
+                    Array.isArray(reviewData.phoneNumbers)
+                      ? reviewData.phoneNumbers.join(", ")
+                      : ""
+                  }
+                  onChange={(e) =>
+                    updateReviewField(
+                      "phoneNumbers",
+                      e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                  className="min-h-24"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Merchant
+                </label>
+                {merchantOptions.length > 0 ? (
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    value={reviewData.merchant ?? ""}
+                    onChange={(e) =>
+                      updateReviewField("merchant", e.target.value)
+                    }
+                  >
+                    <option value="" disabled>
+                      Select merchant
+                    </option>
+                    {merchantOptions.map((merchant) => (
+                      <option key={merchant} value={merchant}>
+                        {merchant}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={reviewData.merchant ?? ""}
+                    onChange={(e) =>
+                      updateReviewField("merchant", e.target.value)
+                    }
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Delivery Address
+                </label>
+                <Textarea
+                  value={reviewData.deliveryAddress ?? ""}
+                  onChange={(e) =>
+                    updateReviewField("deliveryAddress", e.target.value)
+                  }
+                  className="min-h-24"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Total Amount (₦)
+                </label>
+                <Input
+                  type="number"
+                  value={String(reviewData.totalAmount ?? 0)}
+                  onChange={(e) =>
+                    updateReviewField(
+                      "totalAmount",
+                      Number(e.target.value) || 0,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Comment
+                </label>
+                <Input
+                  value={reviewData.comment ?? ""}
+                  onChange={(e) => updateReviewField("comment", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto px-6 pb-6">
+            <Table className="w-full text-sm">
+              <TableHead>
+                <TableRow className="text-left text-muted-foreground">
+                  <TableCell className="px-2 py-2">Product</TableCell>
+                  <TableCell className="px-2 py-2">Quantity</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {reviewData.items.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="px-2 py-2">
+                      <Input
+                        value={item.name}
+                        onChange={(e) =>
+                          updateReviewItem(idx, "name", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="px-2 py-2">
+                      <Input
+                        type="number"
+                        value={String(item.quantity)}
+                        onChange={(e) =>
+                          updateReviewItem(
+                            idx,
+                            "quantity",
+                            Number(e.target.value) || 0,
+                          )
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-muted/20 bg-muted px-6 py-4 sm:flex-row sm:justify-between sm:items-center">
+            {error ? (
+              <p className="text-sm text-destructive">{error}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Review the order details and submit when ready.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3">
               <Button
-                variant="outline"
-                onClick={() => {
-                  setExtractedData(null);
-                  setText("");
-                }}
+                variant="secondary"
+                onClick={() => setReviewData(null)}
                 disabled={isLoading}
-                className="flex-1"
               >
-                Extract Another
+                Clear review
+              </Button>
+              <Button
+                onClick={saveExtractedOrder}
+                className="bg-primary hover:bg-primary/90"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Submit Order"
+                )}
               </Button>
             </div>
           </div>
@@ -324,6 +478,3 @@ export default function OrderExtractionForm() {
     </div>
   );
 }
-
-// Missing import - add this
-import { Zap } from "lucide-react";

@@ -10,7 +10,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "RachamHub - Lagos Logistics Management",
   description: "RachamHub: Logistics management system for RachamHub Nigeria",
-  generator: "v0.app",
   icons: {
     icon: [
       {
@@ -37,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
-      <body className="font-sans antialiased" suppressHydrationWarning>
+      <body className="font-sans antialiased relative" suppressHydrationWarning>
         <AuthProvider>
           {children}
           {process.env.NODE_ENV === "production" && <Analytics />}
