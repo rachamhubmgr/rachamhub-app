@@ -97,6 +97,8 @@ CREATE TABLE public.orders (
   created_at timestamp with time zone,
   updated_at timestamp with time zone,
   delivery_status delivery_status,
+  warehouse_delivery_status text not null default 'pending',
+  fom_delivery_status text not null default 'pending',
   inventory_status inventory_status,
   status role
 );

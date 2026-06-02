@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,7 @@ const printTicket = (order: Order) => {
       </head>
       <body>
         <div class="ticket">
-          <h1>RACHAMHUB LOGISTICS TICKET</h1>
+          <h1>RACHAMHUB LIMITED TICKET</h1>
           <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
           <div class="field"><span class="label">Customer:</span> ${order.customer_name}</div>
           <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
@@ -114,6 +115,7 @@ export default function WarehouseOrdersPage() {
   const [tempComment, setTempComment] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ccUsers, setCcUsers] = useState<any[]>([]);
 
   const isFormValid = (form: Order | null) => {
     if (!form) return false;
@@ -125,7 +127,7 @@ export default function WarehouseOrdersPage() {
     );
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -135,11 +137,16 @@ export default function WarehouseOrdersPage() {
         .select("*")
         .order("created_at", { ascending: false });
 
+      const { data: ccUserData } = await supabase!
+        .from("users")
+        .select("id, display_name")
+        .eq("role", "customer_service");
+      if (ccUserData) setCcUsers(ccUserData);
+      console.log(ccUserData);
+
       if (fetchError) {
         throw fetchError;
       }
-
-      console.log(data);
 
       setOrders((data ?? []) as Order[]);
     } catch (err) {
@@ -147,7 +154,7 @@ export default function WarehouseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const startEditing = (order: Order) => {
     setEditingId(order.id);
@@ -175,8 +182,6 @@ export default function WarehouseOrdersPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
-
     // Fetch all users with the 'fom' role to use for display mapping and dropdown
     const fetchFomUsers = async () => {
       const { data } = await supabase!
@@ -186,20 +191,9 @@ export default function WarehouseOrdersPage() {
       if (data) setFomUsers(data);
     };
     fetchFomUsers();
-
-    const channel = supabase!
-      .channel("warehouse-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchOrders(),
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
   }, []);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
   const handleSave = async () => {
     if (!editForm || !supabase) return;
@@ -224,7 +218,7 @@ export default function WarehouseOrdersPage() {
         .from("orders")
         .update({
           status: "warehouse",
-          delivery_status: editForm.delivery_status,
+          warehouse_delivery_status: editForm.warehouse_delivery_status,
           inventory_status: (editForm as any).inventory_status,
           fom_assigned: validFomId,
           warehouse_comment: (editForm as any).warehouse_comment,
@@ -408,13 +402,16 @@ export default function WarehouseOrdersPage() {
                       <TableCell>
                         {isEditing ? (
                           <select
-                            value={editForm?.delivery_status || "pending"}
+                            value={
+                              editForm?.warehouse_delivery_status || "pending"
+                            }
                             onChange={(e) =>
                               setEditForm((prev) =>
                                 prev
                                   ? {
                                       ...prev,
-                                      delivery_status: e.target.value as any,
+                                      warehouse_delivery_status: e.target
+                                        .value as any,
                                     }
                                   : null,
                               )
@@ -431,10 +428,12 @@ export default function WarehouseOrdersPage() {
                           <span
                             className={cn(
                               "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                              STATUS_STYLES[order.delivery_status || "pending"],
+                              STATUS_STYLES[
+                                order.warehouse_delivery_status || "pending"
+                              ],
                             )}
                           >
-                            {order.delivery_status || "pending"}
+                            {order.warehouse_delivery_status || "pending"}
                           </span>
                         )}
                       </TableCell>
@@ -523,7 +522,8 @@ export default function WarehouseOrdersPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        {order.extracted_by?.split("-")[0] || "—"}
+                        {ccUsers.find((u) => u.id === order.extracted_by)
+                          ?.display_name || "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -533,8 +533,12 @@ export default function WarehouseOrdersPage() {
                                 size="icon-sm"
                                 variant="ghost"
                                 onClick={handleSave}
-                                disabled={isSaving}
-                                title="Save"
+                                disabled={isSaving || !isFormValid(editForm)}
+                                title={
+                                  isFormValid(editForm)
+                                    ? "Save"
+                                    : "Please fill all required fields"
+                                }
                               >
                                 {isSaving ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -545,7 +549,10 @@ export default function WarehouseOrdersPage() {
                               <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                onClick={() => setEditingId(null)}
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setEditForm(null);
+                                }}
                                 disabled={isSaving}
                                 title="Cancel"
                               >

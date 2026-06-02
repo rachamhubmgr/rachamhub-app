@@ -32,6 +32,9 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<any>(null);
+  const [passwordValue, setPasswordValue] = useState("");
   const [form, setForm] = useState({
     email: "",
     display_name: "",
@@ -122,12 +125,53 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleResetPassword = (email: string) => {
-    toast.promise(supabase!.auth.resetPasswordForEmail(email), {
-      loading: "Sending reset email...",
-      success: "Password reset link sent to " + email,
-      error: "Error sending reset email",
-    });
+  const handleResetPassword = (user: any) => {
+    setPasswordTargetUser(user);
+    setPasswordValue("");
+    setPasswordModalOpen(true);
+  };
+
+  const submitNewPassword = async () => {
+    if (!passwordValue || passwordValue.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+
+    const doUpdate = async () => {
+      const { data: sessionData } = await supabase!.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/admin/set-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId: passwordTargetUser.id,
+          password: passwordValue,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to set password");
+      return json;
+    };
+
+    try {
+      await toast.promise(doUpdate(), {
+        loading: "Updating password...",
+        success: `Password updated for ${passwordTargetUser.email}`,
+        error: "Error updating password",
+      });
+      setPasswordModalOpen(false);
+      setPasswordTargetUser(null);
+      setPasswordValue("");
+      fetchUsers();
+    } catch (e) {
+      // already handled by toast
+    }
   };
 
   return (
@@ -192,7 +236,7 @@ export default function UserManagementPage() {
                       <Button
                         size="icon-sm"
                         variant="ghost"
-                        onClick={() => handleResetPassword(u.email)}
+                        onClick={() => handleResetPassword(u)}
                         title="Reset Password"
                       >
                         <Key className="h-3 w-3" />
@@ -270,6 +314,38 @@ export default function UserManagementPage() {
               Cancel
             </Button>
             <Button onClick={handleSaveUser}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set New Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {passwordTargetUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={passwordValue}
+                onChange={(e) => setPasswordValue(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitNewPassword}>Set Password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

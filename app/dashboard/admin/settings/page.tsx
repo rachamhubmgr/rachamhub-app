@@ -7,11 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Building2, Settings2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Building2,
+  Settings2,
+  Truck,
+  MapPin,
+} from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [merchants, setMerchants] = useState<any[]>([]);
+  const [riders, setRiders] = useState<any[]>([]);
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [newMerchant, setNewMerchant] = useState("");
+  const [newRider, setNewRider] = useState("");
+  const [newRiderPhone, setNewRiderPhone] = useState("");
+  const [newLandmark, setNewLandmark] = useState("");
+  const [newLandmarkPrice, setNewLandmarkPrice] = useState("");
   const [settings, setSettings] = useState({
     order_prefix: "RCH-",
     session_timeout: "60",
@@ -26,8 +39,23 @@ export default function AdminSettingsPage() {
     if (data) setMerchants(data);
   };
 
+  const fetchRiders = async () => {
+    const { data } = await supabase!.from("riders").select("*").order("name");
+    if (data) setRiders(data);
+  };
+
+  const fetchLandmarks = async () => {
+    const { data } = await supabase!
+      .from("landmarks")
+      .select("*")
+      .order("name");
+    if (data) setLandmarks(data);
+  };
+
   useEffect(() => {
     fetchMerchants();
+    fetchRiders();
+    fetchLandmarks();
     // load system settings
     (async () => {
       const { data } = await supabase!.from("settings").select("key, value");
@@ -65,6 +93,58 @@ export default function AdminSettingsPage() {
     else fetchMerchants();
   };
 
+  const handleAddRider = async () => {
+    if (!newRider || !newRiderPhone) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    const { error } = await supabase!
+      .from("riders")
+      .insert([{ name: newRider, phone: newRiderPhone }]);
+    if (error) toast.error("Failed to add rider");
+    else {
+      toast.success("Rider added");
+      setNewRider("");
+      setNewRiderPhone("");
+      fetchRiders();
+    }
+  };
+
+  const handleDeactivateRider = async (id: string, current: boolean) => {
+    const { error } = await supabase!
+      .from("riders")
+      .update({ is_active: !current })
+      .eq("id", id);
+    if (error) toast.error("Action failed");
+    else fetchRiders();
+  };
+
+  const handleAddLandmark = async () => {
+    if (!newLandmark || !newLandmarkPrice) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    const { error } = await supabase!
+      .from("landmarks")
+      .insert([{ name: newLandmark, price: Number(newLandmarkPrice) }]);
+    if (error) toast.error("Failed to add landmark");
+    else {
+      toast.success("Landmark added");
+      setNewLandmark("");
+      setNewLandmarkPrice("");
+      fetchLandmarks();
+    }
+  };
+
+  const handleDeactivateLandmark = async (id: string, current: boolean) => {
+    const { error } = await supabase!
+      .from("landmarks")
+      .update({ is_active: !current })
+      .eq("id", id);
+    if (error) toast.error("Action failed");
+    else fetchLandmarks();
+  };
+
   const saveSettings = () => {
     (async () => {
       try {
@@ -89,7 +169,7 @@ export default function AdminSettingsPage() {
       <div>
         <h1 className="text-3xl font-bold">System Settings</h1>
         <p className="text-muted-foreground">
-          Manage global configurations and merchant partners.
+          Manage global configurations, merchants, riders, and landmarks.
         </p>
       </div>
 
@@ -112,7 +192,7 @@ export default function AdminSettingsPage() {
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-80 overflow-y-auto">
             {merchants.map((m) => (
               <div
                 key={m.id}
@@ -140,8 +220,123 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
 
-        {/* General Settings */}
+        {/* Riders Management */}
         <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Truck className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Riders</h2>
+          </div>
+
+          <div className="flex flex-col gap-2 mb-6">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Rider Name..."
+                value={newRider}
+                onChange={(e) => setNewRider(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Phone Number..."
+                value={newRiderPhone}
+                onChange={(e) => setNewRiderPhone(e.target.value)}
+              />
+              <Button onClick={handleAddRider}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {riders.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+              >
+                <div>
+                  <p
+                    className={`text-sm font-medium ${!r.is_active ? "line-through text-muted-foreground" : ""}`}
+                  >
+                    {r.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{r.phone}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={
+                    r.is_active ? "text-destructive" : "text-emerald-600"
+                  }
+                  onClick={() => handleDeactivateRider(r.id, r.is_active)}
+                >
+                  {r.is_active ? "Deactivate" : "Activate"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Landmarks Management */}
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <MapPin className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Landmarks & Prices</h2>
+          </div>
+
+          <div className="flex flex-col gap-2 mb-6">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Landmark Name..."
+                value={newLandmark}
+                onChange={(e) => setNewLandmark(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Price (₦)..."
+                value={newLandmarkPrice}
+                onChange={(e) => setNewLandmarkPrice(e.target.value)}
+              />
+              <Button onClick={handleAddLandmark}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {landmarks.map((l) => (
+              <div
+                key={l.id}
+                className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+              >
+                <div>
+                  <p
+                    className={`text-sm font-medium ${!l.is_active ? "line-through text-muted-foreground" : ""}`}
+                  >
+                    {l.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ₦{Number(l.price).toLocaleString()}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={
+                    l.is_active ? "text-destructive" : "text-emerald-600"
+                  }
+                  onClick={() => handleDeactivateLandmark(l.id, l.is_active)}
+                >
+                  {l.is_active ? "Deactivate" : "Activate"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* General Settings */}
+        {/* <Card className="p-6">
           <div className="flex items-center gap-2 mb-6">
             <Settings2 className="h-5 w-5 text-primary" />
             <h2 className="text-xl font-semibold">General Config</h2>
@@ -191,7 +386,7 @@ export default function AdminSettingsPage() {
               Save System Configuration
             </Button>
           </div>
-        </Card>
+        </Card> */}
       </div>
     </div>
   );

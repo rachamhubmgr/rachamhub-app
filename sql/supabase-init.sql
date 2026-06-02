@@ -41,6 +41,8 @@ create table if not exists public.orders (
   total_amount numeric(12, 2) default 0,
   status text not null default 'customer_service',
   delivery_status text not null default 'pending',
+  warehouse_delivery_status text not null default 'pending',
+  fom_delivery_status text not null default 'pending',
   inventory_status text not null default 'unpacked',
   warehouse_comment text,
   fom_assigned uuid references public.users(id) on delete
@@ -200,6 +202,8 @@ insert into public.orders (
     items,
     total_amount,
     delivery_status,
+    warehouse_delivery_status,
+    fom_delivery_status,
     inventory_status,
     fom_assigned,
     fom_comment,
@@ -216,6 +220,8 @@ values (
     'Extracted via demo',
     '[{"name":"Product A","quantity":5,"weight":2}]',
     500.00,
+    'pending',
+    'pending',
     'pending',
     'unpacked',
     '77777777-7777-7777-7777-777777777777',
@@ -234,6 +240,8 @@ values (
     '[{"name":"Product B","quantity":3}]',
     300.00,
     'processing',
+    'processing',
+    'processing',
     'packed',
     '44444444-4444-4444-4444-444444444444',
     null,
@@ -249,6 +257,60 @@ insert into public.settings (key, value)
 values ('order_prefix', 'RCH-'),
   ('session_timeout', '60'),
   ('fom_names', 'FOM1,FOM2,FOM3') on conflict do nothing;
+-- =====================
+-- riders table
+-- =====================
+create table if not exists public.riders (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  phone text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- =====================
+-- landmarks table
+-- =====================
+create table if not exists public.landmarks (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  price numeric(12, 2) not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- =====================
+-- Triggers for riders and landmarks
+-- =====================
+drop trigger if exists riders_set_updated_at on public.riders;
+create trigger riders_set_updated_at before
+update on public.riders for each row execute procedure public.set_updated_at();
+drop trigger if exists landmarks_set_updated_at on public.landmarks;
+create trigger landmarks_set_updated_at before
+update on public.landmarks for each row execute procedure public.set_updated_at();
+-- =====================
+-- RLS policies for riders and landmarks
+-- =====================
+alter table public.riders enable row level security;
+create policy riders_dev_allow_all on public.riders for all using (true) with check (true);
+alter table public.landmarks enable row level security;
+create policy landmarks_dev_allow_all on public.landmarks for all using (true) with check (true);
+-- =====================
+-- Sample riders and landmarks
+-- =====================
+insert into public.riders (name, phone, is_active)
+values
+  ('Ikechukwu Okonkwo', '+234-8050000001', true),
+  ('Chinedu Eze', '+234-8050000002', true),
+  ('Tunde Adeyemi', '+234-8050000003', true) on conflict do nothing;
+insert into public.landmarks (name, price, is_active)
+values
+  ('Lekki Phase 1', 500.00, true),
+  ('Victoria Island', 600.00, true),
+  ('Ikoyi', 550.00, true),
+  ('Surulere', 400.00, true),
+  ('Yaba', 350.00, true),
+  ('Ajah', 650.00, true) on conflict do nothing;
 -- Customer inquiries
 create table if not exists public.customer_inquiries (
   id uuid primary key default gen_random_uuid(),

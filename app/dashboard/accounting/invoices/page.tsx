@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export default function InvoicesPage() {
       const { data, error: fetchError } = await supabase!
         .from("orders")
         .select("*")
-        .eq("delivery_status", "delivered")
+        .eq("fom_delivery_status", "delivered")
         .in("payment_method", ["Cash", "Transfer"])
         .neq("payment_confirmed", "Yes")
         .order("created_at", { ascending: false });
@@ -63,9 +64,9 @@ export default function InvoicesPage() {
       const { error: updateError } = await supabase!
         .from("orders")
         .update({
-          payment_confirmed: verify.confirmed,
-          payment_bank: verify.bank,
-          status: verify.confirmed === "Yes" ? "paid" : "fom",
+          payment_confirmed: verify.confirmed === "Yes",
+          bank: verify.bank,
+          status: verify.confirmed === "Yes" ? "accounting" : "fom",
           updated_at: new Date().toISOString(),
         })
         .eq("id", orderId);
@@ -85,21 +86,32 @@ export default function InvoicesPage() {
     }
   };
 
-  useEffect(() => {
-    fetchInvoices();
-    const channel = supabase!
-      .channel("accounting-invoices")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchInvoices(),
-      )
-      .subscribe();
+  const fetchInvoices = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    try {
+      const { data, error: fetchError } = await supabase!
+        .from("orders")
+        .select("*")
+        .eq("fom_delivery_status", "delivered")
+        .in("payment_method", ["Cash", "Transfer"])
+        .neq("payment_confirmed", "Yes")
+        .order("created_at", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      setOrders((data ?? []) as Order[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load invoices.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchInvoices, []);
 
   const updateVerify = (
     orderId: string,

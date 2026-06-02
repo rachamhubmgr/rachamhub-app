@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,36 +31,51 @@ import { Label } from "@/components/ui/label";
 const formatCurrency = (value: number) =>
   `₦${Number(value || 0).toLocaleString()}`;
 
-const buildCsv = (orders: Order[]) => {
+const buildCsv = (orders: Order[], fomUsers: any[] = []) => {
   const headers = [
     "Order ID",
     "Created At",
     "Customer Name",
     "Merchant",
+    "Items",
     "Total Amount",
-    "Delivery Status",
+    "Warehouse Delivery Status",
+    "Fom Delivery Status",
     "Inventory Status",
+    "FOM Assigned",
+    "Rider Name",
+    "Rider Price",
     "Payment Method",
     "Payment Confirmed",
     "Payment by Merchant",
     "Bank",
-    "Assigned FOM",
+    "Delivery Address",
+    "Phone Numbers",
   ];
 
-  const rows = orders.map((order) => [
-    order.id,
-    new Date(order.created_at).toISOString(),
-    order.customer_name || "",
-    order.merchant || "",
-    Number(order.total_amount || 0).toFixed(2),
-    order.delivery_status || "",
-    order.inventory_status || "",
-    order.payment_method || "",
-    order.payment_confirmed ? "Yes" : "No",
-    Number(order.payment_by_merchant || 0).toFixed(2),
-    order.bank || "",
-    order.fom_assigned || "",
-  ]);
+  const rows = orders.map((order) => {
+    const fomUser = fomUsers.find((u) => u.id === (order as any).fom_assigned);
+    return [
+      `${order.id.split("-")[0]}`,
+      new Date(order.created_at).toLocaleString(),
+      order.customer_name || "",
+      order.merchant || "",
+      order.items?.map((i) => `${i.quantity}x ${i.name}`).join("; ") || "",
+      Number(order.total_amount || 0).toFixed(2),
+      order.warehouse_delivery_status || "",
+      order.fom_delivery_status || "",
+      (order as any).inventory_status || "",
+      fomUser?.display_name || "",
+      (order as any).rider_name || "",
+      Number((order as any).price_with_rider || 0).toFixed(2),
+      (order as any).payment_method || "",
+      (order as any).payment_confirmed ? "Yes" : "No",
+      Number(order.payment_by_merchant || 0).toFixed(2),
+      (order as any).bank || "",
+      order.delivery_address || "",
+      Array.isArray(order.phone_numbers) ? order.phone_numbers.join(", ") : "",
+    ];
+  });
 
   const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
@@ -77,14 +94,18 @@ export default function AdminOrdersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Order | null>(null);
   const [fomUsers, setFomUsers] = useState<any[]>([]);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  const [riderOptions, setRiderOptions] = useState<string[]>([]);
+  const [editedFields, setEditedFields] = useState<Set<string>>(new Set());
 
   // Modal states for long text fields
   const [modalOpen, setModalOpen] = useState(false);
   const [modalField, setModalField] = useState<string | null>(null);
   const [modalValue, setModalValue] = useState("");
+  const [modalOrderId, setModalOrderId] = useState<string | null>(null);
   const [modalItemIndex, setModalItemIndex] = useState<number | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -94,6 +115,28 @@ export default function AdminOrdersPage() {
       .select("id, display_name")
       .eq("role", "fom");
     if (userData) setFomUsers(userData);
+
+    const [{ data: merchantData }, { data: riderData }] = await Promise.all([
+      supabase!
+        .from("merchants")
+        .select("name")
+        .eq("is_active", true)
+        .order("name"),
+      supabase!
+        .from("riders")
+        .select("name")
+        .eq("is_active", true)
+        .order("name"),
+    ]);
+
+    if (merchantData) {
+      setMerchantOptions(
+        merchantData.map((row: any) => row.name).filter(Boolean),
+      );
+    }
+    if (riderData) {
+      setRiderOptions(riderData.map((row: any) => row.name).filter(Boolean));
+    }
 
     try {
       let query = supabase!
@@ -115,42 +158,38 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [endDate, startDate]);
 
-  useEffect(() => {
-    fetchOrders();
-    const channel = supabase!
-      .channel("admin-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        fetchOrders,
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
-  }, [startDate, endDate]);
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
+    startDate,
+    endDate,
+  ]);
 
   const startEditing = (order: Order) => {
     setEditingId(order.id);
     setEditForm({ ...order });
+    setEditedFields(new Set());
   };
 
   const openModal = (
     field: string,
     value: string,
+    orderId: string,
     index: number | null = null,
   ) => {
     setModalField(field);
     setModalValue(value);
+    setModalOrderId(orderId);
     setModalItemIndex(index);
     setModalOpen(true);
   };
 
   const handleSaveModalValue = () => {
-    if (modalField && editForm) {
+    if (modalField && editForm && modalOrderId && modalOrderId === editingId) {
+      const newEditedFields = new Set(editedFields);
+      newEditedFields.add(modalField);
+      setEditedFields(newEditedFields);
+
       setEditForm((prev) => {
         if (!prev) return null;
         if (modalField === "phone_numbers") {
@@ -190,7 +229,8 @@ export default function AdminOrdersPage() {
           merchant: editForm.merchant,
           items: editForm.items,
           total_amount: editForm.total_amount,
-          delivery_status: editForm.delivery_status,
+          warehouse_delivery_status: editForm.warehouse_delivery_status,
+          fom_delivery_status: editForm.fom_delivery_status,
           inventory_status: (editForm as any).inventory_status,
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
@@ -245,7 +285,7 @@ export default function AdminOrdersPage() {
   };
 
   const handleExport = () => {
-    const csv = buildCsv(orders);
+    const csv = buildCsv(orders, fomUsers);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -260,12 +300,12 @@ export default function AdminOrdersPage() {
   const summary = useMemo(() => {
     const total = orders.length;
     const delivered = orders.filter(
-      (order) => order.delivery_status === "delivered",
+      (order) => order.fom_delivery_status === "delivered",
     ).length;
     const failed = orders.filter(
       (order) =>
-        order.delivery_status === "failed" ||
-        order.delivery_status === "cancelled",
+        order.fom_delivery_status === "failed" ||
+        order.fom_delivery_status === "cancelled",
     ).length;
     const revenue = orders.reduce(
       (sum, order) => sum + Number(order.total_amount || 0),
@@ -416,12 +456,13 @@ export default function AdminOrdersPage() {
                 <TableHead>Address</TableHead>
                 <TableHead>Merchant</TableHead>
                 <TableHead>Items</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Deliv. Status</TableHead>
-                <TableHead>Inv. Status</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Warehouse Delivery Status</TableHead>
+                <TableHead>FOM Delivery Status</TableHead>
+                <TableHead>Inventory Status</TableHead>
                 <TableHead>FOM</TableHead>
                 <TableHead>Rider</TableHead>
-                <TableHead>Rider ₦</TableHead>
+                <TableHead>Rider Fee</TableHead>
                 <TableHead>Pay Method</TableHead>
                 <TableHead>Confirmed</TableHead>
                 <TableHead>Bank</TableHead>
@@ -460,17 +501,27 @@ export default function AdminOrdersPage() {
                       {/* Editable Fields */}
                       <TableCell>
                         {isEditing ? (
-                          <Input
-                            className="h-7 text-xs w-28"
-                            value={editForm?.customer_name || ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? { ...prev, customer_name: e.target.value }
-                                  : null,
-                              )
-                            }
-                          />
+                          <div className="flex items-center gap-1">
+                            <Input
+                              className="h-7 text-xs w-28"
+                              value={editForm?.customer_name || ""}
+                              onChange={(e) => {
+                                const newEditedFields = new Set(editedFields);
+                                newEditedFields.add("customer_name");
+                                setEditedFields(newEditedFields);
+                                setEditForm((prev) =>
+                                  prev
+                                    ? { ...prev, customer_name: e.target.value }
+                                    : null,
+                                );
+                              }}
+                            />
+                            {editedFields.has("customer_name") && (
+                              <span className="text-[8px] px-1 py-0.5 rounded-full bg-gray-400 text-gray-700 whitespace-nowrap">
+                                edited
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs">{order.customer_name}</span>
                         )}
@@ -486,10 +537,12 @@ export default function AdminOrdersPage() {
                               : order.delivery_address || ""
                           }
                           onClick={() =>
-                            isEditing &&
                             openModal(
                               "delivery_address",
-                              editForm?.delivery_address || "",
+                              isEditing
+                                ? editForm?.delivery_address || ""
+                                : order.delivery_address || "",
+                              order.id,
                             )
                           }
                         />
@@ -497,17 +550,34 @@ export default function AdminOrdersPage() {
 
                       <TableCell>
                         {isEditing ? (
-                          <Input
-                            className="h-7 text-xs w-24"
-                            value={editForm?.merchant || ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? { ...prev, merchant: e.target.value }
-                                  : null,
-                              )
-                            }
-                          />
+                          <div className="flex items-center gap-1">
+                            <select
+                              className="h-7 w-24 rounded-md border border-input bg-background px-1 text-xs"
+                              value={editForm?.merchant || ""}
+                              onChange={(e) => {
+                                const newEditedFields = new Set(editedFields);
+                                newEditedFields.add("merchant");
+                                setEditedFields(newEditedFields);
+                                setEditForm((prev) =>
+                                  prev
+                                    ? { ...prev, merchant: e.target.value }
+                                    : null,
+                                );
+                              }}
+                            >
+                              <option value="">Select Merchant</option>
+                              {merchantOptions.map((merchant) => (
+                                <option key={merchant} value={merchant}>
+                                  {merchant}
+                                </option>
+                              ))}
+                            </select>
+                            {editedFields.has("merchant") && (
+                              <span className="text-[8px] px-1 py-0.5 rounded-full bg-gray-400 text-gray-700 whitespace-nowrap">
+                                edited
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs">{order.merchant}</span>
                         )}
@@ -523,21 +593,31 @@ export default function AdminOrdersPage() {
 
                       <TableCell>
                         {isEditing ? (
-                          <Input
-                            type="number"
-                            className="h-7 text-xs w-20"
-                            value={editForm?.total_amount || 0}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      total_amount: Number(e.target.value),
-                                    }
-                                  : null,
-                              )
-                            }
-                          />
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              className="h-7 text-xs w-20"
+                              value={editForm?.total_amount || 0}
+                              onChange={(e) => {
+                                const newEditedFields = new Set(editedFields);
+                                newEditedFields.add("total_amount");
+                                setEditedFields(newEditedFields);
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        total_amount: Number(e.target.value),
+                                      }
+                                    : null,
+                                );
+                              }}
+                            />
+                            {editedFields.has("total_amount") && (
+                              <span className="text-[8px] px-1 py-0.5 rounded-full bg-gray-400 text-gray-700 whitespace-nowrap">
+                                edited
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs">
                             {formatCurrency(Number(order.total_amount))}
@@ -549,13 +629,14 @@ export default function AdminOrdersPage() {
                         {isEditing ? (
                           <select
                             className="h-7 w-24 rounded-md border border-input bg-background px-1 text-[10px]"
-                            value={editForm?.delivery_status || ""}
+                            value={editForm?.warehouse_delivery_status || ""}
                             onChange={(e) =>
                               setEditForm((prev) =>
                                 prev
                                   ? {
                                       ...prev,
-                                      delivery_status: e.target.value as any,
+                                      warehouse_delivery_status: e.target
+                                        .value as any,
                                     }
                                   : null,
                               )
@@ -569,7 +650,37 @@ export default function AdminOrdersPage() {
                           </select>
                         ) : (
                           <span className="text-[10px] uppercase">
-                            {order.delivery_status}
+                            {order.warehouse_delivery_status}
+                          </span>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        {isEditing ? (
+                          <select
+                            className="h-7 w-24 rounded-md border border-input bg-background px-1 text-[10px]"
+                            value={editForm?.fom_delivery_status || ""}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      fom_delivery_status: e.target
+                                        .value as any,
+                                    }
+                                  : null,
+                              )
+                            }
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="failed">Failed</option>
+                            <option value="returned">Returned</option>
+                          </select>
+                        ) : (
+                          <span className="text-[10px] uppercase">
+                            {order.fom_delivery_status}
                           </span>
                         )}
                       </TableCell>
@@ -632,8 +743,8 @@ export default function AdminOrdersPage() {
 
                       <TableCell>
                         {isEditing ? (
-                          <Input
-                            className="h-7 text-xs w-24"
+                          <select
+                            className="h-7 w-24 rounded-md border border-input bg-background px-1 text-xs"
                             value={(editForm as any)?.rider_name || ""}
                             onChange={(e) =>
                               setEditForm((prev) =>
@@ -642,7 +753,14 @@ export default function AdminOrdersPage() {
                                   : null,
                               )
                             }
-                          />
+                          >
+                            <option value="">Select Rider</option>
+                            {riderOptions.map((rider) => (
+                              <option key={rider} value={rider}>
+                                {rider}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           <span className="text-xs">
                             {(order as any).rider_name || "—"}
@@ -761,6 +879,7 @@ export default function AdminOrdersPage() {
                                 "cc_comment",
                                 (isEditing ? editForm! : order).cc_comment ||
                                   "",
+                                order.id,
                               )
                             }
                           >
@@ -775,6 +894,7 @@ export default function AdminOrdersPage() {
                                 "warehouse_comment",
                                 (isEditing ? editForm! : order)
                                   .warehouse_comment || "",
+                                order.id,
                               )
                             }
                           >
@@ -789,6 +909,7 @@ export default function AdminOrdersPage() {
                                 "fom_comment",
                                 (isEditing ? editForm! : order).fom_comment ||
                                   "",
+                                order.id,
                               )
                             }
                           >
@@ -856,8 +977,15 @@ export default function AdminOrdersPage() {
         </Card>
       )}
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <Dialog
+        open={modalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) setModalOrderId(null);
+        }}
+      >
         <DialogContent className="sm:max-w-125">
+          <DialogDescription className="hidden">Input Dialog</DialogDescription>
           <DialogHeader>
             <DialogTitle className="capitalize">
               Edit {modalField?.replace(/_/g, " ")}
@@ -868,13 +996,16 @@ export default function AdminOrdersPage() {
               className="min-h-37.5"
               value={modalValue}
               onChange={(e) => setModalValue(e.target.value)}
+              readOnly={modalOrderId !== editingId}
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveModalValue}>Save Changes</Button>
+            {editingId && modalOrderId === editingId && (
+              <Button onClick={handleSaveModalValue}>Save Changes</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

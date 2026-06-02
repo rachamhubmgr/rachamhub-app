@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ export default function OrdersPage() {
   const [editForm, setEditForm] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [ccUsers, setCcUsers] = useState<any[]>([]);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [modalField, setModalField] = useState<
     | "customer_name"
     | "delivery_address"
@@ -45,15 +48,36 @@ export default function OrdersPage() {
   const [modalValue, setModalValue] = useState("");
   const [modalItemIndex, setModalItemIndex] = useState<number | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Load CC users
+      const { data: ccUserData } = await supabase!
+        .from("users")
+        .select("id, display_name")
+        .eq("role", "customer_service");
+      if (ccUserData) setCcUsers(ccUserData);
+
+      const [{ data: merchantData }, { data, error: fetchError }] =
+        await Promise.all([
+          supabase!
+            .from("merchants")
+            .select("name")
+            .eq("is_active", true)
+            .order("name"),
+          supabase!
+            .from("orders")
+            .select("*")
+            .order("created_at", { ascending: false }),
+        ]);
+
+      if (merchantData) {
+        setMerchantOptions(
+          merchantData.map((row: any) => row.name).filter(Boolean),
+        );
+      }
 
       if (fetchError) {
         throw fetchError;
@@ -67,23 +91,7 @@ export default function OrdersPage() {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-    const channel = supabase!
-      .channel("customer-service-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => {
-          fetchOrders();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
-  }, []);
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
   const filteredOrders = useMemo(() => orders, [orders]);
 
@@ -404,7 +412,8 @@ export default function OrdersPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        {order.extracted_by?.split("-")[0] || "—"}
+                        {ccUsers.find((u) => u.id === order.extracted_by)
+                          ?.display_name || "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -462,12 +471,27 @@ export default function OrdersPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Textarea
-              placeholder={`Enter ${modalField?.replace("_", " ")}...`}
-              className="min-h-37.5"
-              value={modalValue}
-              onChange={(e) => setModalValue(e.target.value)}
-            />
+            {modalField === "merchant" ? (
+              <select
+                className="h-12 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={modalValue}
+                onChange={(e) => setModalValue(e.target.value)}
+              >
+                <option value="">Select Merchant</option>
+                {merchantOptions.map((merchant) => (
+                  <option key={merchant} value={merchant}>
+                    {merchant}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Textarea
+                placeholder={`Enter ${modalField?.replace("_", " ")}...`}
+                className="min-h-37.5"
+                value={modalValue}
+                onChange={(e) => setModalValue(e.target.value)}
+              />
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>

@@ -16,7 +16,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export type OrderStatus =
   | "pending"
-  | "processing"
+  | "shelved"
   | "shipped"
   | "delivered"
   | "cancelled";
@@ -51,7 +51,8 @@ export interface Order {
   items: OrderItem[];
   total_amount: number;
   status: UserRole; // Reflects which department is currently handling the order
-  delivery_status?: string | null;
+  warehouse_delivery_status?: string | null;
+  fom_delivery_status?: string | null;
   inventory_status?: string | null;
   warehouse_comment?: string | null;
   fom_assigned?: string | null;

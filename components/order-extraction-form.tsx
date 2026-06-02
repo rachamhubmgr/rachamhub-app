@@ -90,6 +90,8 @@ export default function OrderExtractionForm() {
         throw new Error(result.error || "No order data extracted");
       }
 
+      console.log(result.data);
+
       setReviewData(result.data);
       setIsReviewOpen(true);
       setSuccess(false);
@@ -107,6 +109,11 @@ export default function OrderExtractionForm() {
     const orderToSave = reviewData;
     if (!orderToSave || !user) return;
 
+    if (!orderToSave.merchant?.trim()) {
+      setError("Merchant is required before submitting the order.");
+      return;
+    }
+
     setError(null);
     setIsLoading(true);
 
@@ -122,7 +129,8 @@ export default function OrderExtractionForm() {
         cc_comment: orderToSave.comment,
         items: orderToSave.items,
         total_amount: orderToSave.totalAmount,
-        delivery_status: "pending",
+        warehouse_delivery_status: "pending",
+        fom_delivery_status: "pending",
         inventory_status: "unpacked",
         extracted_by: user.uid,
         created_at: new Date().toISOString(),
@@ -263,7 +271,7 @@ export default function OrderExtractionForm() {
               <Button
                 onClick={saveExtractedOrder}
                 className="bg-primary hover:bg-primary/90"
-                disabled={isLoading}
+                disabled={isLoading || !reviewData.merchant?.trim()}
               >
                 {isLoading ? (
                   <>
@@ -342,6 +350,11 @@ export default function OrderExtractionForm() {
                       updateReviewField("merchant", e.target.value)
                     }
                   />
+                )}
+                {!reviewData.merchant?.trim() && (
+                  <p className="text-sm text-destructive">
+                    Merchant is required before submitting.
+                  </p>
                 )}
               </div>
             </div>
@@ -445,7 +458,7 @@ export default function OrderExtractionForm() {
               <Button
                 onClick={saveExtractedOrder}
                 className="bg-primary hover:bg-primary/90"
-                disabled={isLoading}
+                disabled={isLoading || !reviewData.merchant?.trim()}
               >
                 {isLoading ? (
                   <>

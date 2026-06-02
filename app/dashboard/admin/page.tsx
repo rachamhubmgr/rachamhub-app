@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import {
   Users,
@@ -24,38 +25,25 @@ export default function AdminDashboard() {
   const [usersCount, setUsersCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAdminMetrics = async () => {
-      setLoading(true);
-      const [{ data: orderData }, { data: userData }] = await Promise.all([
-        supabase!.from("orders").select("*"),
-        supabase!.from("users").select("id"),
-      ]);
-      setOrders((orderData ?? []) as Order[]);
-      setUsersCount((userData ?? []).length);
-      setLoading(false);
-    };
-
-    fetchAdminMetrics();
-
-    const channel = supabase!
-      .channel("admin-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        fetchAdminMetrics,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "users" },
-        fetchAdminMetrics,
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
+  const fetchAdminMetrics = useCallback(async () => {
+    setLoading(true);
+    const [{ data: orderData }, { data: userData }] = await Promise.all([
+      supabase!.from("orders").select("*"),
+      supabase!.from("users").select("id"),
+    ]);
+    setOrders((orderData ?? []) as Order[]);
+    setUsersCount((userData ?? []).length);
+    setLoading(false);
   }, []);
+
+  useSupabaseRealtime(
+    [
+      { table: "orders", event: "*" },
+      { table: "users", event: "*" },
+    ],
+    fetchAdminMetrics,
+    [],
+  );
 
   return (
     <div className="space-y-6">

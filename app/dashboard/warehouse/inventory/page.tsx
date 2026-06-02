@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Check, Edit2, Loader2, X } from "lucide-react";
@@ -47,7 +48,7 @@ export default function InventoryPage() {
   const [tempComment, setTempComment] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -69,7 +70,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const startEditing = (order: Order) => {
     setEditingId(order.id);
@@ -127,8 +128,6 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
-
     const fetchFomUsers = async () => {
       const { data } = await supabase!
         .from("users")
@@ -137,20 +136,9 @@ export default function InventoryPage() {
       if (data) setFomUsers(data);
     };
     fetchFomUsers();
-
-    const channel = supabase!
-      .channel("inventory-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchOrders(),
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
   }, []);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
   const inventory = useMemo(() => {
     const summary: Record<string, number> = {};

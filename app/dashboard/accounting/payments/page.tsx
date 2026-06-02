@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Order } from "@/lib/types";
@@ -19,7 +20,7 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -40,23 +41,9 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchPayments();
-    const channel = supabase!
-      .channel("accounting-payments")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchPayments(),
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
   }, []);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchPayments, []);
 
   return (
     <div className="space-y-6">

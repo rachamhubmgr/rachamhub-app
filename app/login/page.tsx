@@ -3,7 +3,7 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "RachamHub - Login",
-  description: "RachamHub Logistics Management System",
+  description: "RachamHub Limited Management System",
 };
 
 export default function LoginPage() {

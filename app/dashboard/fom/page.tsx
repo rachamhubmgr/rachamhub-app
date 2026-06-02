@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -11,6 +11,7 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@/lib/types";
 import {
@@ -35,22 +36,13 @@ import { Textarea } from "@/components/ui/textarea";
 
 export const dynamic = "force-dynamic";
 
-const RIDERS = ["Rider 1", "Rider 2", "Rider 3"];
-const LANDMARKS = [
-  "Ikeja",
-  "Surulere",
-  "Lekki",
-  "Ajah",
-  "Ikorodu",
-  "Mowe",
-  "Ibafo",
-  "Abeokuta",
-];
 const PAYMENT_METHODS = ["Cash", "Transfer", "PBD"];
 const DELIVERY_STATUSES = ["Delivered", "Returned", "Failed", "Cancelled"];
 
 export default function FOMDashboard() {
   const { user } = useAuth();
+  const [riders, setRiders] = useState<string[]>([]);
+  const [landmarks, setLandmarks] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [rowInputs, setRowInputs] = useState<Record<string, any>>({});
@@ -61,35 +53,49 @@ export default function FOMDashboard() {
   >(null);
   const [tempComment, setTempComment] = useState("");
 
+  const fetchFomOrders = useCallback(async () => {
+    if (!user?.uid) return;
+    setLoading(true);
+    const { data } = await supabase!
+      .from("orders")
+      .select("*")
+      .eq("fom_assigned", user.uid)
+      .order("created_at", { ascending: false });
+    setOrders((data ?? []) as Order[]);
+    setLoading(false);
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!user?.uid) return;
 
-    const fetchFomOrders = async () => {
-      setLoading(true);
-      const { data } = await supabase!
-        .from("orders")
-        .select("*")
-        .eq("fom_assigned", user.uid)
-        .order("created_at", { ascending: false });
-      setOrders((data ?? []) as Order[]);
-      setLoading(false);
+    const fetchDropdownData = async () => {
+      const [{ data: riderData }, { data: landmarkData }] = await Promise.all([
+        supabase!
+          .from("riders")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!
+          .from("landmarks")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+      ]);
+
+      if (riderData) {
+        setRiders(riderData.map((row: any) => row.name).filter(Boolean));
+      }
+      if (landmarkData) {
+        setLandmarks(landmarkData.map((row: any) => row.name).filter(Boolean));
+      }
     };
 
-    fetchFomOrders();
-
-    const channel = supabase!
-      .channel("fom-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        fetchFomOrders,
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
+    fetchDropdownData();
   }, [user?.uid]);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchFomOrders, [
+    user?.uid,
+  ]);
 
   const updateRowInput = (orderId: string, field: string, value: any) => {
     setRowInputs((prev) => ({
@@ -140,7 +146,7 @@ export default function FOMDashboard() {
           price_with_rider: riderPrice,
           landmark: inputs.landmark,
           payment_by_merchant: paymentByMerchant,
-          delivery_status: inputs.delivery_status.toLowerCase(),
+          fom_delivery_status: inputs.delivery_status.toLowerCase(),
           payment_method: inputs.payment_method,
           fom_comment: inputs.fom_comment,
           updated_at: new Date().toISOString(),
@@ -161,14 +167,14 @@ export default function FOMDashboard() {
   const fomLevel = user?.role.toUpperCase() || "FOM";
   const assignedOrders = orders.length;
   const inProgress = orders.filter(
-    (order) => order.delivery_status === "processing",
+    (order) => order.fom_delivery_status === "processing",
   ).length;
   const readyForDelivery = orders.filter(
-    (order) => order.delivery_status === "shipped",
+    (order) => order.fom_delivery_status === "shipped",
   ).length;
   const completedToday = orders.filter(
     (order) =>
-      order.delivery_status === "delivered" &&
+      order.fom_delivery_status === "delivered" &&
       new Date(order.updated_at).toDateString() === new Date().toDateString(),
   ).length;
 
@@ -322,7 +328,7 @@ export default function FOMDashboard() {
                             }
                           >
                             <option value="">Select Rider</option>
-                            {RIDERS.map((r) => (
+                            {riders.map((r) => (
                               <option key={r} value={r}>
                                 {r}
                               </option>
@@ -357,7 +363,7 @@ export default function FOMDashboard() {
                             }
                           >
                             <option value="">Select Landmark</option>
-                            {LANDMARKS.map((l) => (
+                            {landmarks.map((l) => (
                               <option key={l} value={l}>
                                 {l}
                               </option>

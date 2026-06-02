@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
@@ -38,7 +39,7 @@ export default function FOMOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
     setError(null);
@@ -63,23 +64,11 @@ export default function FOMOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-    const channel = supabase!
-      .channel("fom-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchOrders(),
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-    };
   }, [user?.uid]);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
+    user?.uid,
+  ]);
 
   const displayOrders = useMemo(() => orders, [orders]);
 
@@ -135,7 +124,7 @@ export default function FOMOrdersPage() {
                   <TableHead>Landmark</TableHead>
                   <TableHead>Price (₦)</TableHead>
                   <TableHead>Pay Method</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Del. Status</TableHead>
                   <TableHead>Comment</TableHead>
                 </TableRow>
               </TableHeader>
@@ -172,10 +161,10 @@ export default function FOMOrdersPage() {
                       <span
                         className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                          STATUS_STYLES[order.delivery_status || "pending"],
+                          STATUS_STYLES[order.fom_delivery_status || "pending"],
                         )}
                       >
-                        {order.delivery_status || "pending"}
+                        {order.fom_delivery_status || "pending"}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs max-w-30 truncate">

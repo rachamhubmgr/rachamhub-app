@@ -43,7 +43,7 @@ export default function NotFound() {
       </div>
 
       <p className="mt-12 text-sm text-muted-foreground/50 uppercase tracking-widest font-mono">
-        Error 404 • RachamHub Logistics
+        Error 404 • RachamHub Limited
       </p>
     </div>
   );
