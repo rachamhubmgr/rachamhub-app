@@ -89,7 +89,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 

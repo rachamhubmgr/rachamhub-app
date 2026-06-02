@@ -26,31 +26,6 @@ export default function InvoicesPage() {
     Record<string, { confirmed: string; bank: string }>
   >({});
 
-  const fetchInvoices = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .eq("fom_delivery_status", "delivered")
-        .in("payment_method", ["Cash", "Transfer"])
-        .neq("payment_confirmed", "Yes")
-        .order("created_at", { ascending: false });
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      setOrders((data ?? []) as Order[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load invoices.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const confirmPayment = async (orderId: string) => {
     const verify = verifications[orderId];
     if (!verify?.confirmed || !verify?.bank) {

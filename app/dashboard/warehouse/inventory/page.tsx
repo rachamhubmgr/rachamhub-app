@@ -108,7 +108,7 @@ export default function InventoryPage() {
         .from("orders")
         .update({
           status: "warehouse",
-          delivery_status: editForm.delivery_status,
+          warehouse_delivery_status: editForm.warehouse_delivery_status,
           inventory_status: (editForm as any).inventory_status,
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
@@ -217,13 +217,16 @@ export default function InventoryPage() {
                     <TableCell>
                       {isEditing ? (
                         <select
-                          value={editForm?.delivery_status || "pending"}
+                          value={
+                            editForm?.warehouse_delivery_status || "pending"
+                          }
                           onChange={(e) =>
                             setEditForm((prev) =>
                               prev
                                 ? {
                                     ...prev,
-                                    delivery_status: e.target.value as any,
+                                    warehouse_delivery_status: e.target
+                                      .value as any,
                                   }
                                 : null,
                             )
@@ -240,10 +243,12 @@ export default function InventoryPage() {
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                            STATUS_STYLES[order.delivery_status || "pending"],
+                            STATUS_STYLES[
+                              order.warehouse_delivery_status || "pending"
+                            ],
                           )}
                         >
-                          {order.delivery_status || "pending"}
+                          {order.warehouse_delivery_status || "pending"}
                         </span>
                       )}
                     </TableCell>
