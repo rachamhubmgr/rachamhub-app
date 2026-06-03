@@ -108,8 +108,9 @@ export default function InventoryPage() {
         .from("orders")
         .update({
           status: "warehouse",
-          warehouse_delivery_status: editForm.warehouse_delivery_status,
-          inventory_status: (editForm as any).inventory_status,
+          warehouse_delivery_status:
+            editForm.warehouse_delivery_status?.toLowerCase(),
+          inventory_status: (editForm as any).inventory_status?.toLowerCase(),
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
           updated_at: new Date().toISOString(),

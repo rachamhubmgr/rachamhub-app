@@ -142,7 +142,6 @@ export default function WarehouseOrdersPage() {
         .select("id, display_name")
         .eq("role", "customer_service");
       if (ccUserData) setCcUsers(ccUserData);
-      console.log(ccUserData);
 
       if (fetchError) {
         throw fetchError;
@@ -214,12 +213,23 @@ export default function WarehouseOrdersPage() {
     const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
 
     try {
+      console.log({
+        status: "warehouse",
+        warehouse_delivery_status:
+          editForm.warehouse_delivery_status?.toLowerCase(),
+        inventory_status: (editForm as any).inventory_status.toLowerCase(),
+        fom_assigned: validFomId,
+        warehouse_comment: (editForm as any).warehouse_comment,
+        updated_at: new Date().toISOString(),
+      });
+
       const { error: updateError } = await supabase!
         .from("orders")
         .update({
           status: "warehouse",
-          warehouse_delivery_status: editForm.warehouse_delivery_status,
-          inventory_status: (editForm as any).inventory_status,
+          warehouse_delivery_status:
+            editForm.warehouse_delivery_status?.toLowerCase(),
+          inventory_status: (editForm as any).inventory_status.toLowerCase(),
           fom_assigned: validFomId,
           warehouse_comment: (editForm as any).warehouse_comment,
           updated_at: new Date().toISOString(),

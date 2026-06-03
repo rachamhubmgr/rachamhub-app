@@ -229,14 +229,15 @@ export default function AdminOrdersPage() {
           merchant: editForm.merchant,
           items: editForm.items,
           total_amount: editForm.total_amount,
-          warehouse_delivery_status: editForm.warehouse_delivery_status,
-          fom_delivery_status: editForm.fom_delivery_status,
-          inventory_status: (editForm as any).inventory_status,
+          warehouse_delivery_status:
+            editForm.warehouse_delivery_status?.toLowerCase(),
+          fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
+          inventory_status: (editForm as any).inventory_status?.toLowerCase(),
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
           rider_name: (editForm as any).rider_name,
           price_with_rider: (editForm as any).price_with_rider,
-          payment_method: (editForm as any).payment_method,
+          payment_method: (editForm as any).payment_method.to,
           payment_confirmed:
             (editForm as any).payment_confirmed === "true" ||
             (editForm as any).payment_confirmed === true,
