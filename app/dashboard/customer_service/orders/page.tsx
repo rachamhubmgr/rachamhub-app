@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Package, Search, Edit2, Check, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -36,6 +37,8 @@ export default function OrdersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [modalField, setModalField] = useState<
     | "customer_name"
     | "delivery_address"
@@ -93,7 +96,21 @@ export default function OrdersPage() {
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
-  const filteredOrders = useMemo(() => orders, [orders]);
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (statusFilter !== "all" && order.status !== statusFilter) return false;
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.delivery_address || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term) ||
+        (order.id || "").toLowerCase().includes(term) ||
+        (order.phone_numbers || []).join(" ").toLowerCase().includes(term)
+      );
+    });
+  }, [orders, statusFilter, searchTerm, filterMerchant]);
 
   const startEditing = (order: Order) => {
     setEditingId(order.id);
@@ -193,6 +210,13 @@ export default function OrdersPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          <OrderSearchFilter
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            merchantOptions={merchantOptions}
+            filterMerchant={filterMerchant}
+            onFilterMerchantChange={setFilterMerchant}
+          />
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>

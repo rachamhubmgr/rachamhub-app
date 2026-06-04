@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import OrderSearchFilter from "@/components/order-search-filter";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -38,6 +39,8 @@ export default function FOMOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!user?.uid) return;
@@ -70,7 +73,19 @@ export default function FOMOrdersPage() {
     user?.uid,
   ]);
 
-  const displayOrders = useMemo(() => orders, [orders]);
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.delivery_address || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term) ||
+        (order.id || "").toLowerCase().includes(term)
+      );
+    });
+  }, [orders, searchTerm, filterMerchant]);
 
   return (
     <div className="space-y-6">
@@ -92,8 +107,8 @@ export default function FOMOrdersPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border bg-muted/50 px-4 py-2 text-sm text-foreground">
-            {displayOrders.length} active order
-            {displayOrders.length === 1 ? "" : "s"}
+            {filteredOrders.length} active order
+            {filteredOrders.length === 1 ? "" : "s"}
           </div>
         </div>
 
@@ -108,12 +123,19 @@ export default function FOMOrdersPage() {
           <div className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
             {error}
           </div>
-        ) : displayOrders.length === 0 ? (
+        ) : filteredOrders.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             No processed orders found.
           </div>
         ) : (
           <div className="overflow-x-auto">
+            <OrderSearchFilter
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              merchantOptions={[]}
+              filterMerchant={filterMerchant}
+              onFilterMerchantChange={setFilterMerchant}
+            />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -129,7 +151,7 @@ export default function FOMOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayOrders.map((order) => (
+                {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="text-xs font-medium">
                       {order.customer_name}

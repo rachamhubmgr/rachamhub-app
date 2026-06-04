@@ -16,10 +16,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function InvoicesPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifications, setVerifications] = useState<
@@ -88,6 +91,24 @@ export default function InvoicesPage() {
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchInvoices, []);
 
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (!term && !filterMerchant) return true;
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.items || [])
+          .map((i) => i.name)
+          .join(" ")
+          .toLowerCase()
+          .includes(term) ||
+        (order.id || "").toLowerCase().includes(term)
+      );
+    });
+  }, [orders, searchTerm, filterMerchant]);
+
   const updateVerify = (
     orderId: string,
     field: "confirmed" | "bank",
@@ -122,6 +143,13 @@ export default function InvoicesPage() {
         <Card className="p-6 bg-destructive/10 text-destructive">{error}</Card>
       ) : (
         <Card className="overflow-hidden">
+          <OrderSearchFilter
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            merchantOptions={[]}
+            filterMerchant={filterMerchant}
+            onFilterMerchantChange={setFilterMerchant}
+          />
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -137,7 +165,7 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={9}
@@ -147,7 +175,7 @@ export default function InvoicesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                orders.map((order) => (
+                filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="text-xs">
                       {order.customer_name}

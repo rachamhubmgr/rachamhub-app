@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import OrderSearchFilter from "@/components/order-search-filter";
 import { Loader2, Download, Trash2, Edit2, Check, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Textarea } from "@/components/ui/textarea";
@@ -96,6 +97,8 @@ export default function AdminOrdersPage() {
   const [fomUsers, setFomUsers] = useState<any[]>([]);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [riderOptions, setRiderOptions] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [editedFields, setEditedFields] = useState<Set<string>>(new Set());
 
   // Modal states for long text fields
@@ -298,6 +301,20 @@ export default function AdminOrdersPage() {
     URL.revokeObjectURL(url);
   };
 
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.delivery_address || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term) ||
+        (order.id || "").toLowerCase().includes(term)
+      );
+    });
+  }, [orders, searchTerm, filterMerchant]);
+
   const summary = useMemo(() => {
     const total = orders.length;
     const delivered = orders.filter(
@@ -448,6 +465,13 @@ export default function AdminOrdersPage() {
         <Card className="p-6 bg-destructive/10 text-destructive">{error}</Card>
       ) : (
         <Card className="overflow-x-auto">
+          <OrderSearchFilter
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            merchantOptions={merchantOptions}
+            filterMerchant={filterMerchant}
+            onFilterMerchantChange={setFilterMerchant}
+          />
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -472,7 +496,7 @@ export default function AdminOrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={16}
@@ -482,7 +506,7 @@ export default function AdminOrdersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                orders.map((order) => {
+                filteredOrders.map((order) => {
                   const isEditing = editingId === order.id;
                   return (
                     <TableRow

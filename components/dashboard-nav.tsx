@@ -16,6 +16,7 @@ import {
   Home,
   TrendingUp,
   Layers,
+  Store,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/types";
 import { useState } from "react";
@@ -84,9 +85,9 @@ export default function DashboardNav({ className }: DashboardNavProps) {
       ],
       warehouse: [
         {
-          label: "Home",
+          label: "Warehouse",
           href: `/dashboard/${user.role}/`,
-          icon: Warehouse,
+          icon: Store,
         },
         // {
         //   label: "Orders",

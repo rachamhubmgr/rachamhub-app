@@ -14,10 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function PaymentsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPayments = useCallback(async () => {
@@ -45,6 +48,19 @@ export default function PaymentsPage() {
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchPayments, []);
 
+  const filteredOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.id || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term)
+      );
+    });
+  }, [orders, searchTerm, filterMerchant]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -63,12 +79,19 @@ export default function PaymentsPage() {
         </Card>
       ) : error ? (
         <Card className="p-6 bg-destructive/10 text-destructive">{error}</Card>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <Card className="p-6 text-muted-foreground">
           No verified payment records found.
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          <OrderSearchFilter
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            merchantOptions={[]}
+            filterMerchant={filterMerchant}
+            onFilterMerchantChange={setFilterMerchant}
+          />
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -81,7 +104,7 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
+              {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">
                     {order.customer_name}

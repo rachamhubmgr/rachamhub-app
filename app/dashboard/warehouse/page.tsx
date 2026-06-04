@@ -6,9 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Order, OrderStatus } from "@/lib/types";
-import { Check, Edit2, Loader2, Package, X } from "lucide-react";
+import { Order } from "@/lib/types";
+import { Check, Edit2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import OrderSearchFilter from "@/components/order-search-filter";
 import {
   Table,
   TableBody,
@@ -116,16 +117,8 @@ export default function WarehouseOrdersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ccUsers, setCcUsers] = useState<any[]>([]);
-
-  const isFormValid = (form: Order | null) => {
-    if (!form) return false;
-    const f = form as any;
-    return (
-      f.fom_assigned &&
-      f.inventory_status !== "Unpacked" &&
-      f.delivery_status !== "pending"
-    );
-  };
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -146,7 +139,6 @@ export default function WarehouseOrdersPage() {
       if (fetchError) {
         throw fetchError;
       }
-
       setOrders((data ?? []) as Order[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load orders.");
@@ -197,27 +189,29 @@ export default function WarehouseOrdersPage() {
   const handleSave = async () => {
     if (!editForm || !supabase) return;
 
-    setIsSaving(true);
-    setError(null);
+    const assignedFom = (editForm as any).fom_assigned;
+    const inventoryStatus = (editForm as any).inventory_status;
+    const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
 
-    if (!isFormValid(editForm)) {
-      toast.warning("Incomplete Update", {
-        description:
-          "Please assign an FOM and update both Delivery and Inventory statuses before saving.",
-      });
-      setIsSaving(false);
+    if (!inventoryStatus) {
+      toast.error("Please select an inventory status before saving.");
       return;
     }
 
-    const assignedFom = (editForm as any).fom_assigned;
-    const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
+    if (!validFomId) {
+      toast.error("Please assign an FOM before saving.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
 
     try {
       console.log({
         status: "warehouse",
         warehouse_delivery_status:
           editForm.warehouse_delivery_status?.toLowerCase(),
-        inventory_status: (editForm as any).inventory_status.toLowerCase(),
+        inventory_status: inventoryStatus.toLowerCase(),
         fom_assigned: validFomId,
         warehouse_comment: (editForm as any).warehouse_comment,
         updated_at: new Date().toISOString(),
@@ -229,7 +223,7 @@ export default function WarehouseOrdersPage() {
           status: "warehouse",
           warehouse_delivery_status:
             editForm.warehouse_delivery_status?.toLowerCase(),
-          inventory_status: (editForm as any).inventory_status.toLowerCase(),
+          inventory_status: inventoryStatus.toLowerCase(),
           fom_assigned: validFomId,
           warehouse_comment: (editForm as any).warehouse_comment,
           updated_at: new Date().toISOString(),
@@ -254,9 +248,35 @@ export default function WarehouseOrdersPage() {
   };
 
   const actionableOrders = useMemo(
-    () => orders.filter((order) => order.status === "customer_service"),
+    () =>
+      orders.filter(
+        (order) =>
+          order.status === "customer_service" || order.fom_assigned === null,
+      ),
     [orders],
   );
+
+  const canSaveWarehouseUpdate = useMemo(() => {
+    if (!editForm) return false;
+    const inventoryStatus = (editForm as any).inventory_status;
+    const assignedFom = (editForm as any).fom_assigned;
+    return Boolean(inventoryStatus && assignedFom);
+  }, [editForm]);
+
+  const filteredActionableOrders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return actionableOrders.filter((order) => {
+      if (filterMerchant && order.merchant !== filterMerchant) return false;
+      if (!term) return true;
+      return (
+        (order.customer_name || "").toLowerCase().includes(term) ||
+        (order.delivery_address || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term) ||
+        (order.id || "").toLowerCase().includes(term) ||
+        (order.phone_numbers || []).join(" ").toLowerCase().includes(term)
+      );
+    });
+  }, [actionableOrders, searchTerm, filterMerchant]);
 
   return (
     <div className="space-y-6">
@@ -281,7 +301,8 @@ export default function WarehouseOrdersPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border bg-muted/50 px-4 py-2 text-sm text-foreground">
-            {orders.length} {orders.length === 1 ? "order" : "orders"} in the
+            {filteredActionableOrders.length}{" "}
+            {filteredActionableOrders.length === 1 ? "order" : "orders"} in the
             queue
           </div>
         </div>
@@ -297,296 +318,306 @@ export default function WarehouseOrdersPage() {
           <div className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
             {error}
           </div>
-        ) : actionableOrders.length === 0 ? (
+        ) : filteredActionableOrders.length === 0 ? (
           <div className="rounded-xl bg-secondary p-6 text-sm text-secondary-foreground">
             No warehouse orders are waiting for pickup.
           </div>
         ) : (
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="font-semibold">Order ID</TableHead>
-                <TableHead className="font-semibold">Date & Time</TableHead>
-                <TableHead className="font-semibold">Customer Name</TableHead>
-                <TableHead className="font-semibold">
-                  Delivery Address
-                </TableHead>
-                <TableHead className="font-semibold">Phone</TableHead>
-                <TableHead className="font-semibold">Product Name</TableHead>
-                <TableHead className="font-semibold">Qty</TableHead>
-                <TableHead className="font-semibold">Amount (₦)</TableHead>
-                <TableHead className="font-semibold">Merchant Name</TableHead>
-                <TableHead className="font-semibold text-xs">
-                  CC Comment
-                </TableHead>
-                <TableHead className="font-semibold text-xs whitespace-nowrap">
-                  Delivery Status
-                </TableHead>
-                <TableHead className="font-semibold text-xs whitespace-nowrap">
-                  Inventory Status
-                </TableHead>
-                <TableHead className="font-semibold text-xs whitespace-nowrap">
-                  FOM Assigned
-                </TableHead>
-                <TableHead className="font-semibold text-xs whitespace-nowrap">
-                  Warehouse Comment
-                </TableHead>
-                <TableHead className="font-semibold">Entered By</TableHead>
-                <TableHead className="text-right font-semibold">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {actionableOrders.length === 0 ? (
+          <div>
+            <OrderSearchFilter
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              merchantOptions={[]}
+              filterMerchant={filterMerchant}
+              onFilterMerchantChange={setFilterMerchant}
+            />
+            <Table>
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableCell
-                    colSpan={16}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No orders match the selected status.
-                  </TableCell>
+                  <TableHead className="font-semibold">Order ID</TableHead>
+                  <TableHead className="font-semibold">Date & Time</TableHead>
+                  <TableHead className="font-semibold">Customer Name</TableHead>
+                  <TableHead className="font-semibold">
+                    Delivery Address
+                  </TableHead>
+                  <TableHead className="font-semibold">Phone</TableHead>
+                  <TableHead className="font-semibold">Product Name</TableHead>
+                  <TableHead className="font-semibold">Qty</TableHead>
+                  <TableHead className="font-semibold">Amount (₦)</TableHead>
+                  <TableHead className="font-semibold">Merchant Name</TableHead>
+                  <TableHead className="font-semibold text-xs">
+                    CC Comment
+                  </TableHead>
+                  <TableHead className="font-semibold text-xs whitespace-nowrap">
+                    Delivery Status
+                  </TableHead>
+                  <TableHead className="font-semibold text-xs whitespace-nowrap">
+                    Inventory Status
+                  </TableHead>
+                  <TableHead className="font-semibold text-xs whitespace-nowrap">
+                    FOM Assigned
+                  </TableHead>
+                  <TableHead className="font-semibold text-xs whitespace-nowrap">
+                    Warehouse Comment
+                  </TableHead>
+                  <TableHead className="font-semibold">Entered By</TableHead>
+                  <TableHead className="text-right font-semibold">
+                    Actions
+                  </TableHead>
                 </TableRow>
-              ) : (
-                actionableOrders.map((order) => {
-                  const isEditing = editingId === order.id;
-                  return (
-                    <TableRow
-                      key={order.id}
-                      className={isEditing ? "bg-muted/30" : ""}
+              </TableHeader>
+              <TableBody>
+                {actionableOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={16}
+                      className="h-24 text-center text-muted-foreground"
                     >
-                      <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        #{order.id.split("-")[0]}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">
-                        {new Date(order.created_at).toLocaleString([], {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium text-foreground text-xs">
-                          {order.customer_name || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs">
-                          {order.delivery_address || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs">
-                          {order.phone_numbers?.join(", ") || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs">
-                          {order.items?.map((item) => item.name).join(", ") ||
-                            "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs text-center block">
-                          {order.items?.reduce(
-                            (total, item) => total + item.quantity,
-                            0,
-                          ) || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs text-center block">
-                          {`₦${Number(order.total_amount).toLocaleString()}` ||
-                            "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs">
-                          {order.merchant || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-foreground text-xs italic">
-                          {order.cc_comment || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <select
-                            value={
-                              editForm?.warehouse_delivery_status || "pending"
-                            }
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      warehouse_delivery_status: e.target
-                                        .value as any,
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="shelved">Shelved</option>
-                            <option value="returned">Returned</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                              STATUS_STYLES[
-                                order.warehouse_delivery_status || "pending"
-                              ],
-                            )}
-                          >
-                            {order.warehouse_delivery_status || "pending"}
+                      No orders match the selected status.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredActionableOrders.map((order) => {
+                    const isEditing = editingId === order.id;
+                    return (
+                      <TableRow
+                        key={order.id}
+                        className={isEditing ? "bg-muted/30" : ""}
+                      >
+                        <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
+                          #{order.id.split("-")[0]}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {new Date(order.created_at).toLocaleString([], {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium text-foreground text-xs">
+                            {order.customer_name || "—"}
                           </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <select
-                            value={
-                              (editForm as any)?.inventory_status || "Unpacked"
-                            }
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      inventory_status: e.target.value as any,
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
-                          >
-                            <option value="Unpacked">Unpacked</option>
-                            <option value="Packed">Packed</option>
-                            <option value="out of stock">out of stock</option>
-                          </select>
-                        ) : (
-                          <span className="text-xs text-foreground whitespace-nowrap">
-                            {(order as any).inventory_status || "Unpacked"}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs">
+                            {order.delivery_address || "—"}
                           </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <select
-                            value={(editForm as any)?.fom_assigned || ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      fom_assigned: e.target.value as any,
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
-                          >
-                            <option value="">Unassigned</option>
-                            {fomUsers.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.display_name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-xs text-foreground whitespace-nowrap">
-                            {fomUsers.find(
-                              (u) => u.id === (order as any).fom_assigned,
-                            )?.display_name ||
-                              (order as any).fom_assigned ||
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs">
+                            {order.phone_numbers?.join(", ") || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs">
+                            {order.items?.map((item) => item.name).join(", ") ||
                               "—"}
                           </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={(editForm as any)?.warehouse_comment || ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      warehouse_comment: e.target.value,
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 text-xs min-w-30"
-                            placeholder="Add note..."
-                          />
-                        ) : (
-                          <span className="text-xs text-foreground block max-w-37.5 truncate">
-                            {(order as any).warehouse_comment || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs text-center block">
+                            {order.items?.reduce(
+                              (total, item) => total + item.quantity,
+                              0,
+                            ) || "—"}
                           </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        {ccUsers.find((u) => u.id === order.extracted_by)
-                          ?.display_name || "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs text-center block">
+                            {`₦${Number(order.total_amount).toLocaleString()}` ||
+                              "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs">
+                            {order.merchant || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-foreground text-xs italic">
+                            {order.cc_comment || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           {isEditing ? (
-                            <>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                onClick={handleSave}
-                                disabled={isSaving || !isFormValid(editForm)}
-                                title={
-                                  isFormValid(editForm)
-                                    ? "Save"
-                                    : "Please fill all required fields"
-                                }
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4 text-emerald-500" />
-                                )}
-                              </Button>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setEditForm(null);
-                                }}
-                                disabled={isSaving}
-                                title="Cancel"
-                              >
-                                <X className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={() => startEditing(order)}
-                              title="Edit"
+                            <select
+                              value={
+                                editForm?.warehouse_delivery_status || "pending"
+                              }
+                              onChange={(e) =>
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        warehouse_delivery_status: e.target
+                                          .value as any,
+                                      }
+                                    : null,
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
                             >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
+                              <option value="pending">Pending</option>
+                              <option value="delivered">Delivered</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="shelved">Shelved</option>
+                              <option value="returned">Returned</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                                STATUS_STYLES[
+                                  order.warehouse_delivery_status || "pending"
+                                ],
+                              )}
+                            >
+                              {order.warehouse_delivery_status || "pending"}
+                            </span>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <select
+                              value={
+                                (editForm as any)?.inventory_status ||
+                                "Unpacked"
+                              }
+                              onChange={(e) =>
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        inventory_status: e.target.value as any,
+                                      }
+                                    : null,
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
+                            >
+                              <option value="Unpacked">Unpacked</option>
+                              <option value="Packed">Packed</option>
+                              <option value="out of stock">out of stock</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs text-foreground whitespace-nowrap">
+                              {(order as any).inventory_status || "Unpacked"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <select
+                              value={(editForm as any)?.fom_assigned || ""}
+                              onChange={(e) =>
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        fom_assigned: e.target.value as any,
+                                      }
+                                    : null,
+                                )
+                              }
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
+                            >
+                              <option value="">Unassigned</option>
+                              {fomUsers.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.display_name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-foreground whitespace-nowrap">
+                              {fomUsers.find(
+                                (u) => u.id === (order as any).fom_assigned,
+                              )?.display_name ||
+                                (order as any).fom_assigned ||
+                                "—"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              value={(editForm as any)?.warehouse_comment || ""}
+                              onChange={(e) =>
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        warehouse_comment: e.target.value,
+                                      }
+                                    : null,
+                                )
+                              }
+                              className="h-8 text-xs min-w-30"
+                              placeholder="Add note..."
+                            />
+                          ) : (
+                            <span className="text-xs text-foreground block max-w-37.5 truncate">
+                              {(order as any).warehouse_comment || "—"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
+                          {ccUsers.find((u) => u.id === order.extracted_by)
+                            ?.display_name || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {isEditing ? (
+                              <>
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  onClick={handleSave}
+                                  disabled={isSaving || !canSaveWarehouseUpdate}
+                                  title={
+                                    canSaveWarehouseUpdate
+                                      ? "Save"
+                                      : "Select both inventory status and FOM assignment before saving"
+                                  }
+                                >
+                                  {isSaving ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4 text-emerald-500" />
+                                  )}
+                                </Button>
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setEditForm(null);
+                                  }}
+                                  disabled={isSaving}
+                                  title="Cancel"
+                                >
+                                  <X className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => startEditing(order)}
+                                title="Edit"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Card>
 
