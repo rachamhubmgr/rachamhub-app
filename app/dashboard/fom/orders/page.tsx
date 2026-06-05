@@ -24,7 +24,8 @@ import OrderSearchFilter from "@/components/order-search-filter";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
-  shipped: "Ready for Delivery",
+  shipped: "Shipped",
+  shelved: "Shelved",
   delivered: "Delivered",
   cancelled: "Cancelled",
   returned: "Returned",
@@ -33,10 +34,13 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-purple-100 text-purple-900",
   shipped: "bg-blue-100 text-blue-900",
+  shelved: "bg-yellow-100 text-yellow-900",
   delivered: "bg-emerald-100 text-emerald-900",
   cancelled: "bg-slate-100 text-slate-900",
   returned: "bg-orange-100 text-orange-900",
 };
+
+const PAYMENT_METHODS = ["Cash", "Transfer", "PBD"];
 
 export default function FOMOrdersPage() {
   const { user } = useAuth();
@@ -94,13 +98,18 @@ export default function FOMOrdersPage() {
     if (!editForm || !supabase) return;
     setIsSaving(true);
     setError(null);
-
+    console.log({
+      payment_method: editForm.payment_method?.toLowerCase(),
+      fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
+      fom_comment: editForm.fom_comment,
+      updated_at: new Date().toISOString(),
+    });
     try {
       const { error: updateError } = await supabase!
         .from("orders")
         .update({
-          payment_method: editForm.payment_method,
-          fom_delivery_status: editForm.fom_delivery_status,
+          payment_method: editForm.payment_method?.toLowerCase(),
+          fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
           fom_comment: editForm.fom_comment,
           updated_at: new Date().toISOString(),
         })
@@ -236,7 +245,7 @@ export default function FOMOrdersPage() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {isEditing ? (
-                          <Input
+                          <select
                             value={editForm?.payment_method ?? ""}
                             onChange={(e) =>
                               setEditForm((prev) =>
@@ -245,8 +254,15 @@ export default function FOMOrdersPage() {
                                   : prev,
                               )
                             }
-                            className="h-8 text-xs"
-                          />
+                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          >
+                            <option value="">Select Method</option>
+                            {PAYMENT_METHODS.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           (order as any).payment_method || "—"
                         )}
@@ -292,6 +308,7 @@ export default function FOMOrdersPage() {
                         {isEditing ? (
                           <Textarea
                             value={editForm?.fom_comment ?? ""}
+                            placeholder="enter warehouse or delivery notes"
                             onChange={(e) =>
                               setEditForm((prev) =>
                                 prev
@@ -311,15 +328,6 @@ export default function FOMOrdersPage() {
                             <Button
                               size="icon-sm"
                               variant="ghost"
-                              onClick={cancelEditing}
-                              disabled={isSaving}
-                              title="Cancel"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
                               onClick={handleSave}
                               disabled={isSaving}
                               title="Save"
@@ -329,6 +337,15 @@ export default function FOMOrdersPage() {
                               ) : (
                                 <Check className="h-4 w-4 text-emerald-500" />
                               )}
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={cancelEditing}
+                              disabled={isSaving}
+                              title="Cancel"
+                            >
+                              <X className="h-4 w-4 text-red-600" />
                             </Button>
                           </div>
                         ) : (
