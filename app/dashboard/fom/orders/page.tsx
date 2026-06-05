@@ -41,6 +41,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const PAYMENT_METHODS = ["Cash", "Transfer", "PBD"];
+const BANK_OPTIONS = ["UBA", "moniepoint"];
 
 export default function FOMOrdersPage() {
   const { user } = useAuth();
@@ -109,6 +110,7 @@ export default function FOMOrdersPage() {
         .from("orders")
         .update({
           payment_method: editForm.payment_method?.toLowerCase(),
+          bank: editForm.bank,
           fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
           fom_comment: editForm.fom_comment,
           updated_at: new Date().toISOString(),
@@ -210,6 +212,7 @@ export default function FOMOrdersPage() {
                   <TableHead>Landmark</TableHead>
                   <TableHead>Price (₦)</TableHead>
                   <TableHead>Pay Method</TableHead>
+                  <TableHead>Bank</TableHead>
                   <TableHead>Del. Status</TableHead>
                   <TableHead>Comment</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -245,30 +248,62 @@ export default function FOMOrdersPage() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {isEditing ? (
-                          <select
-                            value={editForm?.payment_method ?? ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? { ...prev, payment_method: e.target.value }
-                                  : prev,
-                              )
-                            }
-                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                          >
-                            <option value="">Select Method</option>
-                            {PAYMENT_METHODS.map((m) => (
-                              <option key={m} value={m}>
-                                {m}
-                              </option>
-                            ))}
-                          </select>
+                          editForm?.payment_method ? (
+                            <span className="text-xs text-muted-foreground">
+                              {editForm.payment_method}
+                            </span>
+                          ) : (
+                            <select
+                              value={editForm?.payment_method ?? ""}
+                              onChange={(e) =>
+                                setEditForm((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        payment_method: e.target.value,
+                                      }
+                                    : prev,
+                                )
+                              }
+                              className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                            >
+                              <option value="">Select Method</option>
+                              {PAYMENT_METHODS.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                          )
                         ) : (
                           (order as any).payment_method || "—"
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-xs">
                         {isEditing ? (
+                          <select
+                            value={editForm?.bank ?? ""}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev ? { ...prev, bank: e.target.value } : prev,
+                              )
+                            }
+                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          >
+                            <option value="">Select Bank</option>
+                            {BANK_OPTIONS.map((bank) => (
+                              <option key={bank} value={bank}>
+                                {bank}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          (order as any).bank || "—"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isEditing &&
+                        editForm?.fom_delivery_status !== "delivered" ? (
                           <select
                             value={editForm?.fom_delivery_status ?? "pending"}
                             onChange={(e) =>

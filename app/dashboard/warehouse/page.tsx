@@ -68,6 +68,7 @@ const printTicket = (order: Order) => {
           body { font-family: sans-serif; padding: 20px; line-height: 1.5; color: #333; }
           .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: auto; }
           h1 { text-align: center; margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #000; padding-bottom: 10px; }
+          .call { text-align: center; font-size: 1.1rem; margin: 10px 0; font-style: italic; color: #555; }
           .field { margin-bottom: 10px; font-size: 1rem; }
           .label { font-weight: bold; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -78,10 +79,11 @@ const printTicket = (order: Order) => {
       <body>
         <div class="ticket">
           <h1>RACHAMHUB LIMITED TICKET</h1>
-          <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
+          <h2 class="call">* Call before going *</h2>
           <div class="field"><span class="label">Customer:</span> ${order.customer_name}</div>
           <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
           <div class="field"><span class="label">Address:</span> ${order.delivery_address}</div>
+          <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
           
           <table>
             <thead>
