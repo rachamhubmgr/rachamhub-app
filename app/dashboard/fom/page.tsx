@@ -122,13 +122,9 @@ export default function FOMDashboard() {
 
   const handleFomSubmit = async (order: Order) => {
     const inputs = rowInputs[order.id] || {};
-    if (
-      !inputs.rider_name ||
-      !inputs.delivery_status ||
-      !inputs.payment_method
-    ) {
-      toast.error("Required fields missing", {
-        description: "Rider, Delivery Status, and Payment Method are required.",
+    if (!inputs.rider_name || !inputs.price_with_rider || !inputs.landmark) {
+      toast.info("Required fields missing", {
+        description: "Rider name, rider Price, and landmark are required.",
       });
       return;
     }
@@ -146,7 +142,7 @@ export default function FOMDashboard() {
           price_with_rider: riderPrice,
           landmark: inputs.landmark,
           payment_by_merchant: paymentByMerchant,
-          fom_delivery_status: inputs.delivery_status.toLowerCase(),
+          fom_delivery_status: inputs.delivery_status?.toLowerCase(),
           payment_method: inputs.payment_method,
           fom_comment: inputs.fom_comment,
           updated_at: new Date().toISOString(),

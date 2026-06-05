@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";

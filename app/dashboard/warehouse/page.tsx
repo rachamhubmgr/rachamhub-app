@@ -439,42 +439,16 @@ export default function WarehouseOrdersPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {isEditing ? (
-                            <select
-                              value={
-                                editForm?.warehouse_delivery_status || "pending"
-                              }
-                              onChange={(e) =>
-                                setEditForm((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        warehouse_delivery_status: e.target
-                                          .value as any,
-                                      }
-                                    : null,
-                                )
-                              }
-                              className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="delivered">Delivered</option>
-                              <option value="cancelled">Cancelled</option>
-                              <option value="shelved">Shelved</option>
-                              <option value="returned">Returned</option>
-                            </select>
-                          ) : (
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                                STATUS_STYLES[
-                                  order.warehouse_delivery_status || "pending"
-                                ],
-                              )}
-                            >
-                              {order.warehouse_delivery_status || "pending"}
-                            </span>
-                          )}
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                              STATUS_STYLES[
+                                order.warehouse_delivery_status || "pending"
+                              ],
+                            )}
+                          >
+                            {order.warehouse_delivery_status || "pending"}
+                          </span>
                         </TableCell>
                         <TableCell>
                           {isEditing ? (

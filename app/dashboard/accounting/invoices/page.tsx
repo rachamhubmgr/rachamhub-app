@@ -72,9 +72,8 @@ export default function InvoicesPage() {
       const { data, error: fetchError } = await supabase!
         .from("orders")
         .select("*")
-        .eq("fom_delivery_status", "delivered")
-        .in("payment_method", ["Cash", "Transfer"])
-        .neq("payment_confirmed", "Yes")
+        .eq("status", "fom")
+        .neq("rider_name", null)
         .order("created_at", { ascending: false });
 
       if (fetchError) {

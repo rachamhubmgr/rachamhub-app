@@ -5,8 +5,11 @@ import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
-import { Order, OrderStatus } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Order } from "@/lib/types";
+import { Check, Loader2, X, Edit2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import OrderSearchFilter from "@/components/order-search-filter";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -41,6 +45,9 @@ export default function FOMOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Order | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     if (!user?.uid) return;
@@ -72,6 +79,54 @@ export default function FOMOrdersPage() {
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
     user?.uid,
   ]);
+
+  const startEditing = (order: Order) => {
+    setEditingId(order.id);
+    setEditForm({ ...order });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditForm(null);
+  };
+
+  const handleSave = async () => {
+    if (!editForm || !supabase) return;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase!
+        .from("orders")
+        .update({
+          payment_method: editForm.payment_method,
+          fom_delivery_status: editForm.fom_delivery_status,
+          fom_comment: editForm.fom_comment,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editForm.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setEditingId(null);
+      setEditForm(null);
+      setIsSaving(false);
+      window.setTimeout(() => {
+        // Force reload if realtime doesn't refresh immediately
+        fetchOrders();
+      }, 250);
+      toast.success("Order updated successfully.");
+    } catch (err) {
+      setIsSaving(false);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Unable to save changes. Please try again.",
+      );
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -148,52 +203,148 @@ export default function FOMOrdersPage() {
                   <TableHead>Pay Method</TableHead>
                   <TableHead>Del. Status</TableHead>
                   <TableHead>Comment</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="text-xs font-medium">
-                      {order.customer_name}
-                    </TableCell>
-                    <TableCell className="text-[10px] text-muted-foreground max-w-37.5 truncate">
-                      {order.delivery_address}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order.items
-                        ?.map((i) => `${i.quantity}x ${i.name}`)
-                        .join(", ")}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {(order as any).rider_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {(order as any).landmark || "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      ₦
-                      {Number(
-                        (order as any).price_with_rider || 0,
-                      ).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {(order as any).payment_method || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                          STATUS_STYLES[order.fom_delivery_status || "pending"],
+                {filteredOrders.map((order) => {
+                  const isEditing = editingId === order.id;
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="text-xs font-medium">
+                        {order.customer_name}
+                      </TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground max-w-37.5 truncate">
+                        {order.delivery_address}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {order.items
+                          ?.map((i) => `${i.quantity}x ${i.name}`)
+                          .join(", ")}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {(order as any).rider_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {(order as any).landmark || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        ₦
+                        {Number(
+                          (order as any).price_with_rider || 0,
+                        ).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {isEditing ? (
+                          <Input
+                            value={editForm?.payment_method ?? ""}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev
+                                  ? { ...prev, payment_method: e.target.value }
+                                  : prev,
+                              )
+                            }
+                            className="h-8 text-xs"
+                          />
+                        ) : (
+                          (order as any).payment_method || "—"
                         )}
-                      >
-                        {order.fom_delivery_status || "pending"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs max-w-30 truncate">
-                      {(order as any).fom_comment || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <select
+                            value={editForm?.fom_delivery_status ?? "pending"}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      fom_delivery_status: e.target.value,
+                                    }
+                                  : prev,
+                              )
+                            }
+                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          >
+                            {Object.entries(STATUS_LABELS).map(
+                              ([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        ) : (
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                              STATUS_STYLES[
+                                order.fom_delivery_status || "pending"
+                              ],
+                            )}
+                          >
+                            {order.fom_delivery_status || "pending"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-30 truncate">
+                        {isEditing ? (
+                          <Textarea
+                            value={editForm?.fom_comment ?? ""}
+                            onChange={(e) =>
+                              setEditForm((prev) =>
+                                prev
+                                  ? { ...prev, fom_comment: e.target.value }
+                                  : prev,
+                              )
+                            }
+                            className="min-h-20 text-xs"
+                          />
+                        ) : (
+                          (order as any).fom_comment || "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isEditing ? (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={cancelEditing}
+                              disabled={isSaving}
+                              title="Cancel"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={handleSave}
+                              disabled={isSaving}
+                              title="Save"
+                            >
+                              {isSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4 text-emerald-500" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => startEditing(order)}
+                            title="Edit"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
