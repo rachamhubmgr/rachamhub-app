@@ -6,15 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Order, OrderStatus } from "@/lib/types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Order } from "@/lib/types";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +21,6 @@ import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -39,6 +31,7 @@ export default function OrdersPage() {
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+
   const [modalField, setModalField] = useState<
     | "customer_name"
     | "delivery_address"
@@ -99,7 +92,6 @@ export default function OrdersPage() {
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) return false;
       if (filterMerchant && order.merchant !== filterMerchant) return false;
       if (!term) return true;
       return (
@@ -110,50 +102,238 @@ export default function OrdersPage() {
         (order.phone_numbers || []).join(" ").toLowerCase().includes(term)
       );
     });
-  }, [orders, statusFilter, searchTerm, filterMerchant]);
+  }, [orders, searchTerm, filterMerchant]);
 
-  const startEditing = (order: Order) => {
+  const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
     setEditForm({ ...order });
-  };
+  }, []);
 
-  const openModal = (
-    field: typeof modalField & string,
-    value: string,
-    index: number | null = null,
-  ) => {
-    setModalField(field as any);
-    setModalValue(value);
-    setModalItemIndex(index);
-    setModalOpen(true);
-  };
+  const openModal = useCallback(
+    (
+      field: typeof modalField & string,
+      value: string,
+      index: number | null = null,
+    ) => {
+      setModalField(field as any);
+      setModalValue(value);
+      setModalItemIndex(index);
+      setModalOpen(true);
+    },
+    [],
+  );
 
-  const handleSaveModalValue = () => {
-    if (modalField && editForm) {
-      setEditForm((prev) => {
-        if (!prev) return null;
-        if (modalField === "phone_numbers") {
-          return {
-            ...prev,
-            phone_numbers: modalValue
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          };
-        }
-        if (modalField === "item_name" && modalItemIndex !== null) {
-          const newItems = [...(prev.items || [])];
-          newItems[modalItemIndex] = {
-            ...newItems[modalItemIndex],
-            name: modalValue,
-          };
-          return { ...prev, items: newItems };
-        }
-        return { ...prev, [modalField]: modalValue };
-      });
-    }
-    setModalOpen(false);
-  };
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
+      {
+        key: "id",
+        label: "Order ID",
+        render: (row) => `#${String(row.id || "").split("-")[0]}`,
+      },
+      {
+        key: "created_at",
+        label: "Date & Time",
+        render: (row) => {
+          const createdAt = row.created_at as string;
+          if (!createdAt) return "—";
+          return new Date(createdAt).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          });
+        },
+      },
+      {
+        key: "customer_name",
+        label: "Customer Name",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          return isEditing ? (
+            <Input
+              value={editForm?.customer_name || ""}
+              readOnly
+              className="h-8 text-sm cursor-pointer"
+              onClick={() =>
+                openModal("customer_name", editForm?.customer_name || "")
+              }
+            />
+          ) : (
+            (row.customer_name as any) || "—"
+          );
+        },
+      },
+      {
+        key: "delivery_address",
+        label: "Delivery Address",
+        longText: true,
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          return isEditing ? (
+            <Input
+              value={editForm?.delivery_address || ""}
+              readOnly
+              className="h-8 text-sm cursor-pointer"
+              onClick={() =>
+                openModal("delivery_address", editForm?.delivery_address || "")
+              }
+            />
+          ) : (
+            (row.delivery_address as any) || "—"
+          );
+        },
+      },
+      {
+        key: "phone_numbers",
+        label: "Phone",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          const phoneValue = (editForm?.phone_numbers || []).join(", ") || "";
+          return isEditing ? (
+            <Input
+              value={phoneValue}
+              readOnly
+              className="h-8 text-sm cursor-pointer"
+              onClick={() => openModal("phone_numbers", phoneValue)}
+            />
+          ) : (
+            ((row.phone_numbers as string[]) || []).join(", ") || "—"
+          );
+        },
+      },
+      {
+        key: "item_name",
+        label: "Product Name",
+        longText: true,
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          const items = editForm?.items || (row.items as any[]) || [];
+          return isEditing ? (
+            <div className="flex flex-col gap-1">
+              {items.map((item: any, idx: number) => (
+                <Input
+                  key={idx}
+                  value={item.name}
+                  readOnly
+                  className="h-8 text-sm min-w-37.5 cursor-pointer"
+                  onClick={() => openModal("item_name", item.name, idx)}
+                />
+              ))}
+            </div>
+          ) : (
+            ((row.items as any[]) || [])
+              .map((item: any) => item.name)
+              .join(", ") || "—"
+          );
+        },
+      },
+      {
+        key: "item_quantity",
+        label: "Qty",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          const items = editForm?.items || (row.items as any[]) || [];
+          return isEditing ? (
+            <div className="flex flex-col gap-1">
+              {items.map((item: any, idx: number) => (
+                <Input
+                  key={idx}
+                  type="number"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    setEditForm((prev) => {
+                      if (!prev) return null;
+                      const newItems = [...(prev.items || [])];
+                      newItems[idx] = {
+                        ...newItems[idx],
+                        quantity: Number(e.target.value) || 0,
+                      };
+                      return { ...prev, items: newItems };
+                    })
+                  }
+                  className="h-8 text-sm w-20"
+                />
+              ))}
+            </div>
+          ) : (
+            ((row.items as any[]) || []).reduce(
+              (total: number, item: any) => total + item.quantity,
+              0,
+            ) || "—"
+          );
+        },
+      },
+      {
+        key: "total_amount",
+        label: "Amount (₦)",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          return isEditing ? (
+            <Input
+              type="number"
+              value={editForm?.total_amount || 0}
+              onChange={(e) =>
+                setEditForm((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        total_amount: Number(e.target.value),
+                      }
+                    : null,
+                )
+              }
+              className="h-8 text-sm w-24"
+            />
+          ) : (
+            `₦${Number((row.total_amount as any) || 0).toLocaleString()}`
+          );
+        },
+      },
+      {
+        key: "merchant",
+        label: "Merchant Name",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          return isEditing ? (
+            <Input
+              value={editForm?.merchant || ""}
+              readOnly
+              className="h-8 text-sm cursor-pointer"
+              onClick={() => openModal("merchant", editForm?.merchant || "")}
+            />
+          ) : (
+            (row.merchant as any) || "—"
+          );
+        },
+      },
+      {
+        key: "cc_comment",
+        label: "Comments",
+        longText: true,
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          return isEditing ? (
+            <Input
+              value={editForm?.cc_comment || ""}
+              readOnly
+              className="h-8 text-sm cursor-pointer"
+              onClick={() =>
+                openModal("cc_comment", editForm?.cc_comment || "")
+              }
+            />
+          ) : (
+            (row.cc_comment as any) || "—"
+          );
+        },
+      },
+      {
+        key: "extracted_by",
+        label: "Entered By",
+        render: (row) =>
+          ccUsers.find((u) => u.id === (row.extracted_by as any))
+            ?.display_name || "—",
+      },
+    ],
+    [ccUsers, editingId, editForm, openModal],
+  );
 
   const handleSave = async () => {
     if (!editForm || !supabase) return;
@@ -187,6 +367,36 @@ export default function OrdersPage() {
     }
   };
 
+  const handleSaveModalValue = () => {
+    if (!modalField || !editForm) return;
+
+    setEditForm((prev) => {
+      if (!prev) return null;
+
+      if (modalField === "phone_numbers") {
+        return {
+          ...prev,
+          phone_numbers: modalValue
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        };
+      }
+
+      if (modalField === "item_name" && modalItemIndex !== null) {
+        const newItems = [...(prev.items || [])];
+        newItems[modalItemIndex] = {
+          ...newItems[modalItemIndex],
+          name: modalValue,
+        };
+        return { ...prev, items: newItems };
+      }
+
+      return { ...prev, [modalField]: modalValue };
+    });
+    setModalOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -209,281 +419,55 @@ export default function OrdersPage() {
           <p className="text-sm text-destructive/80 mt-2">{error}</p>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <OrderSearchFilter
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            merchantOptions={merchantOptions}
-            filterMerchant={filterMerchant}
-            onFilterMerchantChange={setFilterMerchant}
-          />
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="font-semibold">Order ID</TableHead>
-                <TableHead className="font-semibold">Date & Time</TableHead>
-                <TableHead className="font-semibold">Customer Name</TableHead>
-                <TableHead className="font-semibold">
-                  Delivery Address
-                </TableHead>
-                <TableHead className="font-semibold">Phone</TableHead>
-                <TableHead className="font-semibold">Product Name</TableHead>
-                <TableHead className="font-semibold">Qty</TableHead>
-                <TableHead className="font-semibold">Amount (₦)</TableHead>
-                <TableHead className="font-semibold">Merchant Name</TableHead>
-                <TableHead className="font-semibold">Comments</TableHead>
-                <TableHead className="font-semibold">Entered By</TableHead>
-                <TableHead className="text-right font-semibold">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={12}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No orders match the selected status.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredOrders.map((order) => {
-                  const isEditing = editingId === order.id;
-                  return (
-                    <TableRow
-                      key={order.id}
-                      className={isEditing ? "bg-muted/30" : ""}
+        <Card className="overflow-hidden p-5">
+          <DataTable
+            headers={columns}
+            rows={filteredOrders as any}
+            showActions
+            renderRowActions={(row) => {
+              const orderId = String(row.id);
+              const isEditing = editingId === orderId;
+              return (
+                <div className="flex justify-end gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        title="Save"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => setEditingId(null)}
+                        disabled={isSaving}
+                        title="Cancel"
+                      >
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => startEditing(row as unknown as Order)}
+                      title="Edit"
                     >
-                      <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        #{order.id.split("-")[0]}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">
-                        {new Date(order.created_at).toLocaleString([], {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={editForm?.customer_name || ""}
-                            readOnly
-                            className="h-8 text-sm cursor-pointer"
-                            onClick={() =>
-                              openModal(
-                                "customer_name",
-                                editForm?.customer_name || "",
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="font-medium text-foreground">
-                            {order.customer_name || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={editForm?.delivery_address || ""}
-                            readOnly
-                            className="h-8 text-sm cursor-pointer"
-                            onClick={() =>
-                              openModal(
-                                "delivery_address",
-                                editForm?.delivery_address || "",
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="text-foreground">
-                            {order.delivery_address || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={editForm?.phone_numbers?.join(", ") || ""}
-                            readOnly
-                            className="h-8 text-sm cursor-pointer"
-                            onClick={() =>
-                              openModal(
-                                "phone_numbers",
-                                editForm?.phone_numbers?.join(", ") || "",
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="text-foreground">
-                            {order.phone_numbers?.join(", ") || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <div className="flex flex-col gap-1">
-                            {editForm?.items?.map((item, idx) => (
-                              <Input
-                                key={idx}
-                                value={item.name}
-                                readOnly
-                                className="h-8 text-sm min-w-37.5 cursor-pointer"
-                                onClick={() =>
-                                  openModal("item_name", item.name, idx)
-                                }
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-foreground">
-                            {order.items?.map((item) => item.name).join(", ") ||
-                              "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <div className="flex flex-col gap-1">
-                            {editForm?.items?.map((item, idx) => (
-                              <Input
-                                key={idx}
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  setEditForm((prev) => {
-                                    if (!prev) return null;
-                                    const newItems = [...(prev.items || [])];
-                                    newItems[idx] = {
-                                      ...newItems[idx],
-                                      quantity: Number(e.target.value) || 0,
-                                    };
-                                    return { ...prev, items: newItems };
-                                  })
-                                }
-                                className="h-8 text-sm w-20"
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-foreground">
-                            {order.items?.reduce(
-                              (total, item) => total + item.quantity,
-                              0,
-                            ) || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={editForm?.total_amount || 0}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      total_amount: Number(e.target.value),
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 text-sm w-24"
-                          />
-                        ) : (
-                          <span className="text-foreground">
-                            {`₦${Number(order.total_amount).toLocaleString()}` ||
-                              "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={editForm?.merchant || ""}
-                            readOnly
-                            className="h-8 text-sm cursor-pointer"
-                            onClick={() =>
-                              openModal("merchant", editForm?.merchant || "")
-                            }
-                          />
-                        ) : (
-                          <span className="text-foreground">
-                            {order.merchant || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            value={editForm?.cc_comment || ""}
-                            readOnly
-                            className="h-8 text-sm cursor-pointer"
-                            onClick={() =>
-                              openModal(
-                                "cc_comment",
-                                editForm?.cc_comment || "",
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="text-foreground">
-                            {order.cc_comment || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
-                        {ccUsers.find((u) => u.id === order.extracted_by)
-                          ?.display_name || "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {isEditing ? (
-                            <>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                title="Save"
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4 text-emerald-500" />
-                                )}
-                              </Button>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                onClick={() => setEditingId(null)}
-                                disabled={isSaving}
-                                title="Cancel"
-                              >
-                                <X className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={() => startEditing(order)}
-                              title="Edit"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              );
+            }}
+          />
         </Card>
       )}
 

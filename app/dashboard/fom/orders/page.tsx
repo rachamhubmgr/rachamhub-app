@@ -6,21 +6,12 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Order } from "@/lib/types";
 import { Check, Loader2, X, Edit2 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import OrderSearchFilter from "@/components/order-search-filter";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -48,11 +39,11 @@ export default function FOMOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
 
   const fetchOrders = useCallback(async () => {
     if (!user?.uid) return;
@@ -60,18 +51,27 @@ export default function FOMOrdersPage() {
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .eq("fom_assigned", user.uid)
-        .eq("status", "fom")
-        .order("created_at", { ascending: false });
+      const [{ data: ordersData, error: fetchError }, { data: merchantsData }] =
+        await Promise.all([
+          supabase!
+            .from("orders")
+            .select("*")
+            .eq("fom_assigned", user.uid)
+            .eq("status", "fom")
+            .order("created_at", { ascending: false }),
+          supabase!
+            .from("merchants")
+            .select("name")
+            .eq("is_active", true)
+            .order("name"),
+        ]);
 
-      if (fetchError) {
-        throw fetchError;
+      if (fetchError) throw fetchError;
+
+      if (merchantsData) {
+        setMerchantOptions(merchantsData.map((m: any) => m.name));
       }
-
-      setOrders((data ?? []) as Order[]);
+      setOrders((ordersData ?? []) as Order[]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load FOM orders.",
@@ -85,10 +85,10 @@ export default function FOMOrdersPage() {
     user?.uid,
   ]);
 
-  const startEditing = (order: Order) => {
+  const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
     setEditForm({ ...order });
-  };
+  }, []);
 
   const cancelEditing = () => {
     setEditingId(null);
@@ -99,12 +99,6 @@ export default function FOMOrdersPage() {
     if (!editForm || !supabase) return;
     setIsSaving(true);
     setError(null);
-    console.log({
-      payment_method: editForm.payment_method?.toLowerCase(),
-      fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
-      fom_comment: editForm.fom_comment,
-      updated_at: new Date().toISOString(),
-    });
     try {
       const { error: updateError } = await supabase!
         .from("orders")
@@ -139,19 +133,242 @@ export default function FOMOrdersPage() {
     }
   };
 
-  const filteredOrders = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return orders.filter((order) => {
-      if (filterMerchant && order.merchant !== filterMerchant) return false;
-      if (!term) return true;
+  const ordersByMerchant = useMemo(() => {
+    return orders.filter((order) =>
+      filterMerchant ? order.merchant === filterMerchant : true,
+    );
+  }, [orders, filterMerchant]);
+
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
+      {
+        key: "id",
+        label: "Order ID",
+        render: (row) => `#${String(row.id).split("-")[0]}`,
+      },
+      {
+        key: "fom_assigned_at",
+        label: "Fom Assigned At",
+        render: (row) => (row as any).fom_assigned_at,
+      },
+      {
+        key: "customer",
+        label: "Customer / Address",
+        render: (row) => (
+          <div className="py-1">
+            <div className="text-xs font-semibold truncate">
+              {(row.customer_name as any) || "—"}
+            </div>
+            <div className="text-[10px] text-muted-foreground truncate">
+              {(row.delivery_address as any) || "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "items",
+        label: "Product",
+        render: (row) => (
+          <div className="text-xs truncate">
+            {((row.items as any[]) || [])
+              .map((i) => `${i.quantity}x ${i.name}`)
+              .join(", ") || "—"}
+          </div>
+        ),
+      },
+      {
+        key: "rider_info",
+        label: "Rider / Landmark",
+        render: (row) => (
+          <div className="py-1">
+            <div className="text-xs">{(row as any).rider_name || "—"}</div>
+            <div className="text-[10px] text-muted-foreground truncate">
+              {(row as any).landmark || "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "rider_assigned_at",
+        label: "Rider Assigned At",
+        render: (row) => (row as any).rider_assigned_at,
+      },
+      {
+        key: "payment_to_rider",
+        label: "Rider Price (₦)",
+        render: (row) =>
+          `₦${Number((row as any).payment_to_rider || 0).toLocaleString()}`,
+      },
+      {
+        key: "payment_method",
+        label: "Payment Method",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing) {
+            return editForm?.payment_method ? (
+              <span className="text-xs text-muted-foreground">
+                {editForm.payment_method}
+              </span>
+            ) : (
+              <select
+                value={editForm?.payment_method ?? ""}
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev ? { ...prev, payment_method: e.target.value } : prev,
+                  )
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+              >
+                <option value="">Select Method</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            );
+          }
+          return (row as any).payment_method || "—";
+        },
+      },
+      {
+        key: "bank",
+        label: "Bank",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing) {
+            return (
+              <select
+                value={editForm?.bank ?? ""}
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev ? { ...prev, bank: e.target.value } : prev,
+                  )
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+              >
+                <option value="">Select Bank</option>
+                {BANK_OPTIONS.map((bank) => (
+                  <option key={bank} value={bank}>
+                    {bank}
+                  </option>
+                ))}
+              </select>
+            );
+          }
+          return (row as any).bank || "—";
+        },
+      },
+      {
+        key: "fom_delivery_status",
+        label: "Del. Status",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing && editForm?.fom_delivery_status !== "delivered") {
+            return (
+              <select
+                value={editForm?.fom_delivery_status ?? "pending"}
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev
+                      ? { ...prev, fom_delivery_status: e.target.value }
+                      : prev,
+                  )
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+              >
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            );
+          }
+          return (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                STATUS_STYLES[(row as any).fom_delivery_status || "pending"],
+              )}
+            >
+              {(row as any).fom_delivery_status || "pending"}
+            </span>
+          );
+        },
+      },
+      {
+        key: "fom_comment",
+        label: "Fom Comment",
+        longText: true,
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing) {
+            return (
+              <Textarea
+                value={editForm?.fom_comment ?? ""}
+                placeholder="notes"
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev ? { ...prev, fom_comment: e.target.value } : prev,
+                  )
+                }
+                className="min-h-12 text-xs py-1"
+              />
+            );
+          }
+          return (row as any).fom_comment || "—";
+        },
+      },
+    ],
+    [editingId, editForm],
+  );
+
+  const renderRowActions = useCallback(
+    (row: any) => {
+      const isEditing = editingId === String(row.id);
       return (
-        (order.customer_name || "").toLowerCase().includes(term) ||
-        (order.delivery_address || "").toLowerCase().includes(term) ||
-        (order.merchant || "").toLowerCase().includes(term) ||
-        (order.id || "").toLowerCase().includes(term)
+        <div className="flex justify-end gap-1">
+          {isEditing ? (
+            <>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={handleSave}
+                disabled={isSaving}
+                title="Save"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 text-emerald-500" />
+                )}
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={cancelEditing}
+                disabled={isSaving}
+                title="Cancel"
+              >
+                <X className="h-4 w-4 text-red-600" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => startEditing(row as unknown as Order)}
+              title="Edit"
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       );
-    });
-  }, [orders, searchTerm, filterMerchant]);
+    },
+    [editingId, isSaving, handleSave, startEditing],
+  );
 
   return (
     <div className="space-y-6">
@@ -173,8 +390,8 @@ export default function FOMOrdersPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border bg-muted/50 px-4 py-2 text-sm text-foreground">
-            {filteredOrders.length} active order
-            {filteredOrders.length === 1 ? "" : "s"}
+            {ordersByMerchant.length} active order
+            {ordersByMerchant.length === 1 ? "" : "s"}
           </div>
         </div>
 
@@ -189,217 +406,17 @@ export default function FOMOrdersPage() {
           <div className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
             {error}
           </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            No processed orders found.
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <OrderSearchFilter
-              searchTerm={searchTerm}
-              onSearchTermChange={setSearchTerm}
-              merchantOptions={[]}
-              filterMerchant={filterMerchant}
-              onFilterMerchantChange={setFilterMerchant}
-            />
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Rider</TableHead>
-                  <TableHead>Landmark</TableHead>
-                  <TableHead>Price (₦)</TableHead>
-                  <TableHead>Pay Method</TableHead>
-                  <TableHead>Bank</TableHead>
-                  <TableHead>Del. Status</TableHead>
-                  <TableHead>Comment</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => {
-                  const isEditing = editingId === order.id;
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell className="text-xs font-medium">
-                        {order.customer_name}
-                      </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground max-w-37.5 truncate">
-                        {order.delivery_address}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {order.items
-                          ?.map((i) => `${i.quantity}x ${i.name}`)
-                          .join(", ")}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {(order as any).rider_name || "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {(order as any).landmark || "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        ₦
-                        {Number(
-                          (order as any).price_with_rider || 0,
-                        ).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {isEditing ? (
-                          editForm?.payment_method ? (
-                            <span className="text-xs text-muted-foreground">
-                              {editForm.payment_method}
-                            </span>
-                          ) : (
-                            <select
-                              value={editForm?.payment_method ?? ""}
-                              onChange={(e) =>
-                                setEditForm((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        payment_method: e.target.value,
-                                      }
-                                    : prev,
-                                )
-                              }
-                              className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                            >
-                              <option value="">Select Method</option>
-                              {PAYMENT_METHODS.map((m) => (
-                                <option key={m} value={m}>
-                                  {m}
-                                </option>
-                              ))}
-                            </select>
-                          )
-                        ) : (
-                          (order as any).payment_method || "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {isEditing ? (
-                          <select
-                            value={editForm?.bank ?? ""}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev ? { ...prev, bank: e.target.value } : prev,
-                              )
-                            }
-                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                          >
-                            <option value="">Select Bank</option>
-                            {BANK_OPTIONS.map((bank) => (
-                              <option key={bank} value={bank}>
-                                {bank}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          (order as any).bank || "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing &&
-                        editForm?.fom_delivery_status !== "delivered" ? (
-                          <select
-                            value={editForm?.fom_delivery_status ?? "pending"}
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      fom_delivery_status: e.target.value,
-                                    }
-                                  : prev,
-                              )
-                            }
-                            className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                          >
-                            {Object.entries(STATUS_LABELS).map(
-                              ([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        ) : (
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                              STATUS_STYLES[
-                                order.fom_delivery_status || "pending"
-                              ],
-                            )}
-                          >
-                            {order.fom_delivery_status || "pending"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-30 truncate">
-                        {isEditing ? (
-                          <Textarea
-                            value={editForm?.fom_comment ?? ""}
-                            placeholder="enter warehouse or delivery notes"
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? { ...prev, fom_comment: e.target.value }
-                                  : prev,
-                              )
-                            }
-                            className="min-h-20 text-xs"
-                          />
-                        ) : (
-                          (order as any).fom_comment || "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isEditing ? (
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={handleSave}
-                              disabled={isSaving}
-                              title="Save"
-                            >
-                              {isSaving ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Check className="h-4 w-4 text-emerald-500" />
-                              )}
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={cancelEditing}
-                              disabled={isSaving}
-                              title="Cancel"
-                            >
-                              <X className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            onClick={() => startEditing(order)}
-                            title="Edit"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            headers={columns}
+            rows={ordersByMerchant as any}
+            merchantOptions={merchantOptions}
+            filterMerchant={filterMerchant}
+            onFilterMerchantChange={setFilterMerchant}
+            searchPlaceholder="Search my orders..."
+            showActions
+            renderRowActions={renderRowActions}
+          />
         )}
       </Card>
     </div>

@@ -8,14 +8,7 @@ import { Check, Edit2, Loader2, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import OrderSearchFilter from "@/components/order-search-filter";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-purple-100 text-purple-900",
+  shipped: "bg-blue-100 text-blue-900",
   delivered: "bg-emerald-100 text-emerald-900",
   cancelled: "bg-slate-100 text-slate-900",
   shelved: "bg-amber-100 text-amber-900",
@@ -50,22 +43,172 @@ export default function InventoryPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+
+  const startEditing = useCallback((order: Order) => {
+    setEditingId(order.id);
+    setEditForm({ ...order });
+  }, []);
+
+  const openCommentModal = useCallback(
+    (orderId: string, currentVal: string) => {
+      setActiveCommentOrderId(orderId);
+      setTempComment(currentVal);
+      setCommentModalOpen(true);
+    },
+    [],
+  );
+
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
+      {
+        key: "id",
+        label: "Order ID",
+        render: (row) => `#${String(row.id || "").split("-")[0]}`,
+      },
+      {
+        key: "created_at",
+        label: "Created At",
+        render: (row) =>
+          new Date(row.created_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+      },
+      {
+        key: "customer_name",
+        label: "Customer",
+        longText: true,
+        render: (row) => (row.customer_name as any) || "—",
+      },
+      {
+        key: "delivery_address",
+        label: "Delivery Address",
+        longText: true,
+        render: (row) => (row.delivery_address as any) || "—",
+      },
+      {
+        key: "phone_numbers",
+        label: "Phone",
+        render: (row) =>
+          ((row.phone_numbers as string[]) || []).join(", ") || "—",
+      },
+      {
+        key: "items",
+        label: "Items",
+        longText: true,
+        render: (row) =>
+          ((row.items as any[]) || [])
+            .map((item: any) => `${item.quantity}x ${item.name}`)
+            .join(", "),
+      },
+      {
+        key: "merchant",
+        label: "Merchant",
+        render: (row) => (row.merchant as any) || "—",
+      },
+      {
+        key: "warehouse_delivery_status",
+        label: "Delivery Status",
+        render: (row) =>
+          editingId === String(row.id) ? (
+            <select
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
+              value={(editForm as any)?.warehouse_delivery_status || ""}
+              onChange={(e) =>
+                setEditForm((prev) =>
+                  prev
+                    ? { ...prev, warehouse_delivery_status: e.target.value }
+                    : prev,
+                )
+              }
+            >
+              <option value="">Select status</option>
+              <option value="pending">Pending</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="shelved">Shelved</option>
+              <option value="returned">Returned</option>
+            </select>
+          ) : (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                STATUS_STYLES[
+                  (row.warehouse_delivery_status as any) || "pending"
+                ],
+              )}
+            >
+              {(row.warehouse_delivery_status as any) || "pending"}
+            </span>
+          ),
+      },
+      {
+        key: "inventory_status",
+        label: "Inventory Status",
+        render: (row) => (row as any).inventory_status || "unpacked",
+      },
+      {
+        key: "fom_assigned",
+        label: "FOM Assigned",
+        render: (row) =>
+          fomUsers.find((user) => user.id === (row as any).fom_assigned)
+            ?.display_name || "—",
+      },
+      {
+        key: "warehouse_comment",
+        label: "Warehouse Comment",
+        longText: true,
+        render: (row) =>
+          editingId === String(row.id) ? (
+            <Input
+              className="h-8 text-xs cursor-pointer"
+              readOnly
+              onClick={() =>
+                openCommentModal(
+                  String(row.id),
+                  (editForm as any)?.warehouse_comment || "",
+                )
+              }
+              value={(editForm as any)?.warehouse_comment || "—"}
+            />
+          ) : (
+            (row as any).warehouse_comment || "—"
+          ),
+      },
+    ],
+    [editingId, editForm, fomUsers, openCommentModal],
+  );
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const [
+        { data: ordersData, error: fetchError },
+        { data: merchantsData },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        supabase!
+          .from("merchants")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
 
-      if (fetchError) {
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
-      setOrders((data ?? []) as Order[]);
+      if (merchantsData)
+        setMerchantOptions(merchantsData.map((m: any) => m.name));
+      if (fomUserData) setFomUsers(fomUserData);
+      setOrders((ordersData ?? []) as Order[]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load inventory.",
@@ -74,17 +217,6 @@ export default function InventoryPage() {
       setLoading(false);
     }
   }, []);
-
-  const startEditing = (order: Order) => {
-    setEditingId(order.id);
-    setEditForm({ ...order });
-  };
-
-  const openCommentModal = (orderId: string, currentVal: string) => {
-    setActiveCommentOrderId(orderId);
-    setTempComment(currentVal);
-    setCommentModalOpen(true);
-  };
 
   const handleSaveComment = () => {
     if (
@@ -100,7 +232,7 @@ export default function InventoryPage() {
     setCommentModalOpen(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!editForm) return;
 
     setIsSaving(true);
@@ -129,20 +261,12 @@ export default function InventoryPage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  useEffect(() => {
-    const fetchFomUsers = async () => {
-      const { data } = await supabase!
-        .from("users")
-        .select("id, display_name")
-        .eq("role", "fom");
-      if (data) setFomUsers(data);
-    };
-    fetchFomUsers();
-  }, []);
+  }, [editForm]);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const actionableOrders = useMemo(
     () =>
@@ -167,6 +291,52 @@ export default function InventoryPage() {
       );
     });
   }, [actionableOrders, searchTerm, filterMerchant]);
+
+  const renderRowActions = useCallback(
+    (row: any) => {
+      const orderId = String(row.id);
+      const isEditing = editingId === orderId;
+      return (
+        <div className="flex justify-end gap-1">
+          {isEditing ? (
+            <>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 text-emerald-500" />
+                )}
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditingId(null);
+                  setEditForm(null);
+                }}
+              >
+                <X className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => startEditing(row as unknown as Order)}
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      );
+    },
+    [editingId, handleSave, isSaving, startEditing],
+  );
 
   return (
     <div className="space-y-6">
@@ -198,166 +368,15 @@ export default function InventoryPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <OrderSearchFilter
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            merchantOptions={[]}
+          <DataTable
+            headers={columns}
+            rows={filteredActionableOrders as any}
+            merchantOptions={merchantOptions}
             filterMerchant={filterMerchant}
             onFilterMerchantChange={setFilterMerchant}
+            showActions
+            renderRowActions={renderRowActions}
           />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Merchant</TableHead>
-                <TableHead>Delivery Status</TableHead>
-                <TableHead>Inventory Status</TableHead>
-                <TableHead>FOM Assigned</TableHead>
-                <TableHead>Warehouse Comment</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {actionableOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={16}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No orders match the selected status.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredActionableOrders.map((order) => {
-                  const isEditing = editingId === order.id;
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono text-[10px] uppercase">
-                        #{order.id.split("-")[0]}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {order.customer_name}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {order.items
-                          ?.map((i) => `${i.quantity}x ${i.name}`)
-                          .join(", ")}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {order.merchant}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <select
-                            value={
-                              editForm?.warehouse_delivery_status || "pending"
-                            }
-                            onChange={(e) =>
-                              setEditForm((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      warehouse_delivery_status: e.target
-                                        .value as any,
-                                    }
-                                  : null,
-                              )
-                            }
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px]"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="shelved">Shelved</option>
-                            <option value="returned">Returned</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                              STATUS_STYLES[
-                                order.warehouse_delivery_status || "pending"
-                              ],
-                            )}
-                          >
-                            {order.warehouse_delivery_status || "pending"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs whitespace-nowrap">
-                          {(order as any).inventory_status || "Unpacked"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs whitespace-nowrap">
-                          {fomUsers.find(
-                            (u) => u.id === (order as any).fom_assigned,
-                          )?.display_name || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Input
-                            className="h-8 text-xs cursor-pointer"
-                            value={(editForm as any)?.warehouse_comment || ""}
-                            readOnly
-                            onClick={() =>
-                              openCommentModal(
-                                order.id,
-                                (editForm as any)?.warehouse_comment || "",
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="text-xs truncate block max-w-30">
-                            {(order as any).warehouse_comment || "—"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {isEditing ? (
-                            <>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleSave}
-                                disabled={isSaving}
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4 text-emerald-500" />
-                                )}
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => setEditingId(null)}
-                              >
-                                <X className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => startEditing(order)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
         </div>
       </Card>
 

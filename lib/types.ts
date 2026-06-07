@@ -18,6 +18,7 @@ export type OrderStatus =
   | "pending"
   | "shelved"
   | "shipped"
+  | "returned"
   | "delivered"
   | "cancelled";
 
@@ -58,15 +59,18 @@ export interface Order {
   fom_assigned?: string | null;
   rider_name?: string | null;
   landmark?: string | null;
-  price_with_rider?: number | null;
+  payment_to_rider?: number | null;
   payment_method?: string | null;
-  payment_by_merchant?: number | null;
+  payment_to_merchant?: number | null;
   payment_confirmed?: boolean | null;
   bank?: string | null;
   fom_comment?: string | null;
   extracted_by?: string | null;
   created_at: string;
   updated_at: string;
+  payment_verified_at: string;
+  fom_assigned_at: string;
+  rider_assigned_at: string;
 }
 
 export interface OrderItem {

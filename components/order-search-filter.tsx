@@ -6,8 +6,10 @@ interface Props {
   searchTerm: string;
   onSearchTermChange: (v: string) => void;
   merchantOptions?: string[];
-  filterMerchant: string | null;
-  onFilterMerchantChange: (v: string | null) => void;
+  filterMerchant?: string | null;
+  onFilterMerchantChange?: (v: string | null) => void;
+  placeholder?: string;
+  title?: string;
 }
 
 export default function OrderSearchFilter({
@@ -16,20 +18,22 @@ export default function OrderSearchFilter({
   merchantOptions = [],
   filterMerchant,
   onFilterMerchantChange,
+  placeholder = "Search by customer, address, order id or merchant",
+  title = "Search & Filter",
 }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3 mb-4">
       <h1 className="text-lg font-semibold text-foreground w-full md:w-auto">
-        Search & Filter
+        {title}
       </h1>
       <input
         aria-label="Search orders"
-        placeholder="Search by customer, address, order id or merchant"
+        placeholder={placeholder}
         value={searchTerm}
         onChange={(e) => onSearchTermChange(e.target.value)}
         className="rounded-md border border-input px-3 py-2 text-sm w-full max-w-md"
       />
-      {merchantOptions.length > 0 && (
+      {merchantOptions.length > 0 && onFilterMerchantChange && (
         <select
           value={filterMerchant ?? ""}
           onChange={(e) =>

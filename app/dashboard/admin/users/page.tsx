@@ -5,14 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +28,48 @@ export default function UserManagementPage() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] = useState<any>(null);
   const [passwordValue, setPasswordValue] = useState("");
+
+  const columns: DataTableColumn[] = [
+    {
+      key: "display_name",
+      label: "User",
+      longText: true,
+      render: (row) => (
+        <>
+          <div className="font-medium text-xs">{(row as any).display_name}</div>
+          <div className="text-[10px] text-muted-foreground">
+            {(row as any).email}
+          </div>
+        </>
+      ),
+    },
+    {
+      key: "role",
+      label: "Role",
+      render: (row) => (
+        <Badge variant="outline" className="capitalize text-[10px]">
+          {String((row as any).role).replace("_", " ")}
+        </Badge>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <Badge
+          variant={row.is_active !== false ? "default" : "destructive"}
+          className="text-[10px]"
+        >
+          {row.is_active !== false ? "Active" : "Deactivated"}
+        </Badge>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Created",
+      render: (row) => new Date((row as any).created_at).toLocaleDateString(),
+    },
+  ];
   const [form, setForm] = useState({
     email: "",
     display_name: "",
@@ -194,66 +229,31 @@ export default function UserManagementPage() {
             <Loader2 className="animate-spin h-8 w-8 text-primary" />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <div className="font-medium text-xs">{u.display_name}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {u.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize text-[10px]">
-                      {u.role.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        u.is_active !== false ? "default" : "destructive"
-                      }
-                      className="text-[10px]"
-                    >
-                      {u.is_active !== false ? "Active" : "Deactivated"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[10px]">
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => handleResetPassword(u)}
-                        title="Reset Password"
-                      >
-                        <Key className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => handleOpenModal(u)}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            headers={columns}
+            rows={users as any}
+            searchPlaceholder="Search users..."
+            showActions
+            renderRowActions={(row) => (
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => handleResetPassword(row)}
+                  title="Reset Password"
+                >
+                  <Key className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => handleOpenModal(row)}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          />
         )}
       </Card>
 

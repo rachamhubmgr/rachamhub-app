@@ -5,82 +5,218 @@ import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { Order } from "@/lib/types";
 import { Loader2 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { toast } from "sonner";
-import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function InvoicesPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [foms, setFoms] = useState<any[]>([]);
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifications, setVerifications] = useState<
     Record<string, { confirmed: string; bank: string }>
   >({});
 
-  const confirmPayment = async (orderId: string) => {
-    const verify = verifications[orderId];
-    if (!verify?.confirmed || !verify?.bank) {
-      toast.error("Please select both Confirmed status and Bank account.");
-      return;
-    }
+  const updateVerify = useCallback(
+    (id: string, field: "confirmed" | "bank", value: string) => {
+      setVerifications((prev) => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || { confirmed: "", bank: "" }),
+          [field]: value,
+        },
+      }));
+    },
+    [],
+  );
 
-    setActionLoading(orderId);
-
-    try {
-      const { error: updateError } = await supabase!
-        .from("orders")
-        .update({
-          payment_confirmed: verify.confirmed === "Yes",
-          bank: verify.bank,
-          status: verify.confirmed === "Yes" ? "accounting" : "fom",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
-      if (updateError) {
-        throw updateError;
+  const confirmPayment = useCallback(
+    async (orderId: string) => {
+      const verify = verifications[orderId];
+      if (!verify?.confirmed || !verify?.bank) {
+        toast.error("Please select both Confirmed status and Bank account.");
+        return;
       }
 
-      toast.success("Payment verified successfully");
-      await fetchInvoices();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Unable to update payment status.",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
+      setActionLoading(orderId);
+      try {
+        const { error: updateError } = await supabase!
+          .from("orders")
+          .update({
+            payment_confirmed: true,
+            payment_verified_at: new Date().toISOString(),
+            bank: verify.bank,
+            status: "accounting",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orderId);
 
-  const fetchInvoices = useCallback(async () => {
+        if (updateError) throw updateError;
+
+        toast.success("Payment verified successfully");
+        await fetchData();
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Unable to update payment status.",
+        );
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [verifications],
+  );
+
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
+      {
+        key: "id",
+        label: "Order ID",
+        render: (row) => `#${String(row.id).split("-")[0]}`,
+      },
+      {
+        key: "rider_assigned_at",
+        label: "Rider Assigned At",
+        render: (row) =>
+          new Date(row.rider_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+      },
+      {
+        key: "customer_name",
+        label: "Customer Name",
+        longText: true,
+        render: (row) => (row.customer_name as any) || "—",
+      },
+      {
+        key: "product_name",
+        label: "Product Name",
+        longText: true,
+        render: (row) =>
+          ((row.items as any[]) || []).map((i: any) => i.name).join(", "),
+      },
+      {
+        key: "qty",
+        label: "Qty",
+        render: (row) =>
+          ((row.items as any[]) || []).reduce(
+            (acc: number, i: any) => acc + i.quantity,
+            0,
+          ),
+      },
+      {
+        key: "fom_assigned",
+        label: "FOM Assigned",
+        render: (row) =>
+          foms.find((user) => user.id === (row as any).fom_assigned)
+            ?.display_name || "—",
+      },
+      {
+        key: "total_amount",
+        label: "Order Amount",
+        render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
+      },
+      {
+        key: "landmark",
+        label: "Landmark",
+        render: (row) => (row.landmark as any) || "—",
+      },
+      {
+        key: "landmark_price",
+        label: "Landmark Price",
+        render: (row) =>
+          `₦${
+            landmarks
+              .find((l) => l.name === (row as any).landmark)
+              ?.price?.toLocaleString() || "—"
+          }`,
+      },
+      {
+        key: "rider_name",
+        label: "Rider",
+        longText: true,
+        render: (row) => (row.rider_name as any) || "—",
+      },
+      {
+        key: "payment_to_rider",
+        label: "Rider Fee",
+        render: (row) =>
+          `₦${Number(row.payment_to_rider || 0).toLocaleString()}`,
+      },
+      {
+        key: "payment_method",
+        label: "Payment Method",
+        render: (row) => (row as any).payment_method || "—",
+      },
+      {
+        key: "bank",
+        label: "Bank",
+        render: (row) => (row as any).bank || "—",
+      },
+      {
+        key: "action",
+        label: "Action",
+        render: (row) => (
+          <Button
+            size="sm"
+            className="h-8 px-3"
+            onClick={() => confirmPayment(String(row.id))}
+            disabled={actionLoading === String(row.id)}
+          >
+            {actionLoading === String(row.id) ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              "Confirm Payment"
+            )}
+          </Button>
+        ),
+      },
+    ],
+    [verifications, actionLoading, updateVerify, confirmPayment],
+  );
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .eq("status", "fom")
-        .neq("rider_name", null)
-        .order("created_at", { ascending: false });
+      const [
+        { data: ordersData, error: fetchError },
+        { data: merchantsData },
+        { data: landmarksData },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .eq("status", "fom")
+          .neq("rider_name", null)
+          .order("created_at", { ascending: false }),
+        supabase!
+          .from("merchants")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!.from("landmarks").select("*").eq("is_active", true),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
 
-      if (fetchError) {
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
-      setOrders((data ?? []) as Order[]);
+      if (merchantsData)
+        setMerchantOptions(merchantsData.map((m: any) => m.name));
+      setOrders((ordersData ?? []) as Order[]);
+      setLandmarks((landmarksData ?? []) as any[]);
+      setFoms((fomUserData ?? []) as any[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load invoices.");
     } finally {
@@ -88,160 +224,52 @@ export default function InvoicesPage() {
     }
   }, []);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchInvoices, []);
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, []);
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter((order) => {
-      if (!term && !filterMerchant) return true;
       if (filterMerchant && order.merchant !== filterMerchant) return false;
       if (!term) return true;
       return (
         (order.customer_name || "").toLowerCase().includes(term) ||
-        (order.items || [])
-          .map((i) => i.name)
-          .join(" ")
-          .toLowerCase()
-          .includes(term) ||
-        (order.id || "").toLowerCase().includes(term)
+        (order.id || "").toLowerCase().includes(term) ||
+        (order.merchant || "").toLowerCase().includes(term)
       );
     });
   }, [orders, searchTerm, filterMerchant]);
-
-  const updateVerify = (
-    orderId: string,
-    field: "confirmed" | "bank",
-    value: string,
-  ) => {
-    setVerifications((prev) => ({
-      ...prev,
-      [orderId]: {
-        ...(prev[orderId] || { confirmed: "", bank: "" }),
-        [field]: value,
-      },
-    }));
-  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Invoices</h1>
         <p className="text-muted-foreground mt-2">
-          Review orders ready for invoicing and payment.
+          Verify payments and manage financial records for delivered orders.
         </p>
       </div>
 
       {loading ? (
-        <Card className="p-6 text-center">
+        <Card className="p-12 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">
             Loading invoices...
           </p>
         </Card>
       ) : error ? (
-        <Card className="p-6 bg-destructive/10 text-destructive">{error}</Card>
+        <Card className="p-6 bg-destructive/10 border-destructive/30">
+          <p className="text-destructive font-medium">Error loading invoices</p>
+          <p className="text-sm text-destructive/80 mt-2">{error}</p>
+        </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <OrderSearchFilter
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            merchantOptions={[]}
+        <Card className="p-6">
+          <DataTable
+            headers={columns}
+            rows={filteredOrders as any}
+            merchantOptions={merchantOptions}
             filterMerchant={filterMerchant}
             onFilterMerchantChange={setFilterMerchant}
+            searchPlaceholder="Search invoices..."
           />
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Customer Name</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Order Amount</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Payment by Merchant</TableHead>
-                <TableHead>Confirmed</TableHead>
-                <TableHead>Bank</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={9}
-                    className="py-10 text-center text-muted-foreground"
-                  >
-                    There are no invoices to review right now.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="text-xs">
-                      {order.customer_name}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order.items?.map((i) => i.name).join(", ")}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order.items?.reduce((acc, i) => acc + i.quantity, 0)}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium">
-                      ₦{Number(order.total_amount).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-xs font-semibold text-primary">
-                      {(order as any).payment_method}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      ₦
-                      {Number(
-                        (order as any).payment_by_merchant || 0,
-                      ).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <select
-                        className="h-8 w-24 rounded-md border border-input bg-background px-2 text-[11px]"
-                        value={verifications[order.id]?.confirmed || ""}
-                        onChange={(e) =>
-                          updateVerify(order.id, "confirmed", e.target.value)
-                        }
-                      >
-                        <option value="">Select</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                    </TableCell>
-                    <TableCell>
-                      <select
-                        className="h-8 w-28 rounded-md border border-input bg-background px-2 text-[11px]"
-                        value={verifications[order.id]?.bank || ""}
-                        onChange={(e) =>
-                          updateVerify(order.id, "bank", e.target.value)
-                        }
-                      >
-                        <option value="">Select Bank</option>
-                        <option value="UBA">UBA</option>
-                        <option value="Moniepoint">Moniepoint</option>
-                      </select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        className="h-8"
-                        onClick={() => confirmPayment(order.id)}
-                        disabled={actionLoading === order.id}
-                      >
-                        {actionLoading === order.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          "Confirm"
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </Card>
       )}
     </div>

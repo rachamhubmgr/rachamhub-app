@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -14,14 +14,7 @@ import {
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@/lib/types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -37,128 +30,397 @@ import { Textarea } from "@/components/ui/textarea";
 export const dynamic = "force-dynamic";
 
 const PAYMENT_METHODS = ["Cash", "Transfer", "PBD"];
-const DELIVERY_STATUSES = ["Delivered", "Returned", "Failed", "Cancelled"];
+const DELIVERY_STATUSES = [
+  "Delivered",
+  "shipped",
+  "Returned",
+  "Failed",
+  "Cancelled",
+];
 
 export default function FOMDashboard() {
   const { user } = useAuth();
   const [riders, setRiders] = useState<string[]>([]);
-  const [landmarks, setLandmarks] = useState<string[]>([]);
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [rowInputs, setRowInputs] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [tempComment, setTempComment] = useState("");
   const [activeCommentOrderId, setActiveCommentOrderId] = useState<
     string | null
   >(null);
-  const [tempComment, setTempComment] = useState("");
+  const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+  const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
 
-  const fetchFomOrders = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
-    const { data } = await supabase!
-      .from("orders")
-      .select("*")
-      .eq("fom_assigned", user.uid)
-      .order("created_at", { ascending: false });
+
+    const [
+      { data },
+      { data: riderData },
+      { data: landmarkData },
+      { data: merchantData },
+    ] = await Promise.all([
+      supabase!
+        .from("orders")
+        .select("*")
+        .eq("fom_assigned", user.uid)
+        .order("created_at", { ascending: false }),
+      supabase!
+        .from("riders")
+        .select("name")
+        .eq("is_active", true)
+        .order("name"),
+      supabase!
+        .from("landmarks")
+        .select("*")
+        .eq("is_active", true)
+        .order("name"),
+      supabase!
+        .from("merchants")
+        .select("name")
+        .eq("is_active", true)
+        .order("name"),
+    ]);
+
     setOrders((data ?? []) as Order[]);
+
+    if (riderData) {
+      setRiders(riderData.map((row: any) => row.name).filter(Boolean));
+    }
+    if (landmarkData) {
+      setLandmarks(landmarkData);
+    }
+    if (merchantData) {
+      setMerchantOptions(
+        merchantData.map((row: any) => row.name).filter(Boolean),
+      );
+    }
+
     setLoading(false);
   }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
 
-    const fetchDropdownData = async () => {
-      const [{ data: riderData }, { data: landmarkData }] = await Promise.all([
-        supabase!
-          .from("riders")
-          .select("name")
-          .eq("is_active", true)
-          .order("name"),
-        supabase!
-          .from("landmarks")
-          .select("name")
-          .eq("is_active", true)
-          .order("name"),
-      ]);
-
-      if (riderData) {
-        setRiders(riderData.map((row: any) => row.name).filter(Boolean));
-      }
-      if (landmarkData) {
-        setLandmarks(landmarkData.map((row: any) => row.name).filter(Boolean));
-      }
-    };
-
-    fetchDropdownData();
+    fetchData();
   }, [user?.uid]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchFomOrders, [
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, [
     user?.uid,
   ]);
 
-  const updateRowInput = (orderId: string, field: string, value: any) => {
-    setRowInputs((prev) => ({
-      ...prev,
-      [orderId]: {
-        ...(prev[orderId] || {}),
-        [field]: value,
-      },
-    }));
-  };
+  const updateRowInput = useCallback(
+    (orderId: string, field: string, value: any) => {
+      setRowInputs((prev) => ({
+        ...prev,
+        [orderId]: {
+          ...(prev[orderId] || {}),
+          [field]: value,
+        },
+      }));
+    },
+    [],
+  );
 
-  const openCommentModal = (orderId: string, currentVal: string) => {
-    setActiveCommentOrderId(orderId);
-    setTempComment(currentVal);
-    setCommentModalOpen(true);
-  };
+  const openCommentModal = useCallback(
+    (orderId: string, currentVal: string) => {
+      setActiveCommentOrderId(orderId);
+      setTempComment(currentVal);
+      setCommentModalOpen(true);
+    },
+    [],
+  );
 
-  const handleSaveComment = () => {
+  const handleSaveComment = useCallback(() => {
     if (activeCommentOrderId) {
       updateRowInput(activeCommentOrderId, "fom_comment", tempComment);
     }
     setCommentModalOpen(false);
-  };
+  }, [activeCommentOrderId, tempComment, updateRowInput]);
 
-  const handleFomSubmit = async (order: Order) => {
-    const inputs = rowInputs[order.id] || {};
-    if (!inputs.rider_name || !inputs.price_with_rider || !inputs.landmark) {
-      toast.info("Required fields missing", {
-        description: "Rider name, rider Price, and landmark are required.",
-      });
-      return;
-    }
+  const handleFomSubmit = useCallback(
+    async (order: Order) => {
+      const inputs = rowInputs[order.id] || {};
+      if (!inputs.rider_name || !inputs.payment_to_rider || !inputs.landmark) {
+        toast.info("Required fields missing", {
+          description: "Rider name, rider Price, and landmark are required.",
+        });
+        return;
+      }
 
-    setIsSubmitting(order.id);
-    const riderPrice = Number(inputs.price_with_rider) || 0;
-    const paymentByMerchant = Number(order.total_amount) - riderPrice;
-
-    try {
-      const { error } = await supabase!
-        .from("orders")
-        .update({
-          status: "fom",
-          rider_name: inputs.rider_name,
-          price_with_rider: riderPrice,
-          landmark: inputs.landmark,
-          payment_by_merchant: paymentByMerchant,
-          fom_delivery_status: inputs.delivery_status?.toLowerCase(),
-          payment_method: inputs.payment_method,
-          fom_comment: inputs.fom_comment,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
-
-      if (error) throw error;
-      toast.success("Order submitted successfully");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to submit order",
+      setIsSubmitting(order.id);
+      const riderPrice = Number(inputs.payment_to_rider) || 0;
+      const selectedLandmark = landmarks.find(
+        (l) => l.name === inputs.landmark,
       );
-    } finally {
-      setIsSubmitting(null);
-    }
-  };
+      const landmarkPrice = selectedLandmark
+        ? Number(selectedLandmark.price)
+        : 0;
+      const paymentByMerchant = Number(order.total_amount) - landmarkPrice;
+
+      try {
+        const { error } = await supabase!
+          .from("orders")
+          .update({
+            status: "fom",
+            rider_name: inputs.rider_name,
+            payment_to_rider: riderPrice,
+            landmark: inputs.landmark,
+            payment_to_merchant: paymentByMerchant,
+            fom_delivery_status: inputs.delivery_status?.toLowerCase(),
+            payment_method: inputs.payment_method?.toLowerCase(),
+            fom_comment: inputs.fom_comment,
+            updated_at: new Date().toISOString(),
+            rider_assigned_at: new Date().toISOString(),
+          })
+          .eq("id", order.id);
+
+        if (error) throw error;
+        toast.success("Order submitted successfully");
+        fetchData();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to submit order");
+        toast.error(
+          err instanceof Error ? err.message : "Failed to submit order",
+        );
+      } finally {
+        setIsSubmitting(null);
+      }
+    },
+    [rowInputs, fetchData],
+  );
+
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
+      {
+        key: "id",
+        label: "Order ID",
+        render: (row) => `#${String(row.id).split("-")[0]}`,
+      },
+      {
+        key: "fom_assigned_at",
+        label: "Fom Assigned At",
+        render: (row) => (row as any).fom_assigned_at,
+      },
+      {
+        key: "customer",
+        label: "Customer / Address",
+        render: (row) => (
+          <div className="py-1">
+            <div className="text-xs font-semibold truncate">
+              {row.customer_name as any}
+            </div>
+            <div className="text-[10px] text-muted-foreground truncate">
+              {row.delivery_address as any}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "items",
+        label: "Products",
+        render: (row) => (
+          <div className="text-xs truncate">
+            {((row.items as any[]) || [])
+              .map((i) => `${i.quantity}x ${i.name}`)
+              .join(", ")}
+          </div>
+        ),
+      },
+      {
+        key: "amount",
+        label: "Total Amount (₦)",
+        render: (row) => {
+          const inputs = rowInputs[String(row.id)] || {};
+          const selectedLandmark = landmarks.find(
+            (l) => l.name === inputs.landmark,
+          );
+          const landmarkPrice = selectedLandmark
+            ? Number(selectedLandmark.price)
+            : 0;
+          const paymentByMerchant =
+            Number((row.total_amount as any) || 0) - landmarkPrice;
+          return (
+            <div className="py-1">
+              <div className="text-xs">
+                ₦{Number((row.total_amount as any) || 0).toLocaleString()}
+              </div>
+              <div className="text-[10px] text-emerald-600 font-medium truncate">
+                To Merchant: ₦{paymentByMerchant.toLocaleString()}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "rider_name",
+        label: "Rider Name",
+        render: (row) => (
+          <select
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-[10px]"
+            value={rowInputs[String(row.id)]?.rider_name || ""}
+            onChange={(e) =>
+              updateRowInput(String(row.id), "rider_name", e.target.value)
+            }
+          >
+            <option value="">Select Rider</option>
+            {riders.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        key: "payment_to_rider",
+        label: "Rider Price (₦)",
+        render: (row) => (
+          <Input
+            className="h-7 w-full text-[10px]"
+            type="number"
+            placeholder="0"
+            value={rowInputs[String(row.id)]?.payment_to_rider || ""}
+            onChange={(e) =>
+              updateRowInput(String(row.id), "payment_to_rider", e.target.value)
+            }
+          />
+        ),
+      },
+      {
+        key: "landmark",
+        label: "Landmark",
+        render: (row) => (
+          <select
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-[10px]"
+            value={rowInputs[String(row.id)]?.landmark || ""}
+            onChange={(e) =>
+              updateRowInput(String(row.id), "landmark", e.target.value)
+            }
+          >
+            <option value="">Select Landmark</option>
+            {landmarks.map((l) => (
+              <option key={l.id} value={l.name}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        key: "payment_method",
+        label: "Payment Method",
+        render: (row) => (
+          <select
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-[10px]"
+            value={rowInputs[String(row.id)]?.payment_method || ""}
+            onChange={(e) =>
+              updateRowInput(String(row.id), "payment_method", e.target.value)
+            }
+          >
+            <option value="">Method</option>
+            {PAYMENT_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        key: "delivery_status",
+        label: "Delivery Status",
+        render: (row) => (
+          <select
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-[10px]"
+            value={rowInputs[String(row.id)]?.delivery_status || ""}
+            onChange={(e) =>
+              updateRowInput(String(row.id), "delivery_status", e.target.value)
+            }
+          >
+            <option value="">Pending</option>
+            {DELIVERY_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        key: "fom_comment",
+        label: "FOM Comment",
+        render: (row) => (
+          <Input
+            className="h-7 w-full text-[10px] cursor-pointer"
+            placeholder="Note..."
+            value={rowInputs[String(row.id)]?.fom_comment || ""}
+            readOnly
+            onClick={() =>
+              openCommentModal(
+                String(row.id),
+                rowInputs[String(row.id)]?.fom_comment || "",
+              )
+            }
+          />
+        ),
+      },
+    ],
+    [rowInputs, riders, landmarks, openCommentModal, updateRowInput],
+  );
+
+  const actionableOrdersByMerchant = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status === "warehouse")
+        .filter((o) => (filterMerchant ? o.merchant === filterMerchant : true)),
+    [orders, filterMerchant],
+  );
+
+  const renderRowActions = useCallback(
+    (row: any) => {
+      const orderId = String(row.id);
+      const inputs = rowInputs[orderId] || {};
+      const isComplete = Boolean(
+        inputs.rider_name && inputs.payment_to_rider && inputs.landmark,
+      );
+
+      return (
+        <div className="flex justify-start">
+          <Button
+            size="sm"
+            className="h-7 px-3 text-[10px]"
+            disabled={isSubmitting === orderId || !isComplete}
+            onClick={() => {
+              toast.warning(
+                "Please cross-check values. Once submitted, the order moves to accounting and cannot be edited here.",
+                {
+                  action: {
+                    label: "Proceed",
+                    onClick: () => handleFomSubmit(row as unknown as Order),
+                  },
+                  duration: 6000,
+                },
+              );
+            }}
+          >
+            {isSubmitting === orderId ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )}
+            <span className="ml-1">Submit</span>
+          </Button>
+        </div>
+      );
+    },
+    [rowInputs, isSubmitting, handleFomSubmit],
+  );
 
   const fomLevel = user?.role.toUpperCase() || "FOM";
   const assignedOrders = orders.length;
@@ -250,198 +512,17 @@ export default function FOMDashboard() {
       )}
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-6">
-          New Orders Queue
-        </h2>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-37.5">Customer / Address</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Amount (₦)</TableHead>
-                <TableHead>Rider Name</TableHead>
-                <TableHead>Rider Price (₦)</TableHead>
-                <TableHead>Landmark</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Delivery Status</TableHead>
-                <TableHead>Comment</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.filter((o) => o.status === "warehouse").length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={10}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No new orders assigned.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                orders
-                  .filter((o) => o.status === "warehouse")
-                  .map((order) => {
-                    const inputs = rowInputs[order.id] || {};
-                    const riderPrice = Number(inputs.price_with_rider) || 0;
-                    const paymentByMerchant =
-                      Number(order.total_amount) - riderPrice;
-
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell>
-                          <div className="text-xs font-semibold">
-                            {order.customer_name}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground line-clamp-1">
-                            {order.delivery_address}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {order.items
-                            ?.map((i) => `${i.quantity}x ${i.name}`)
-                            .join(", ")}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-xs">
-                            ₦{Number(order.total_amount).toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-emerald-600 font-medium">
-                            To Merchant: ₦{paymentByMerchant.toLocaleString()}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            className="h-8 w-30 rounded-md border border-input bg-background px-2 text-[11px]"
-                            value={inputs.rider_name || ""}
-                            onChange={(e) =>
-                              updateRowInput(
-                                order.id,
-                                "rider_name",
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">Select Rider</option>
-                            {riders.map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 w-20 text-[11px]"
-                            type="number"
-                            placeholder="0.00"
-                            value={inputs.price_with_rider || ""}
-                            onChange={(e) =>
-                              updateRowInput(
-                                order.id,
-                                "price_with_rider",
-                                e.target.value,
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            className="h-8 w-30 rounded-md border border-input bg-background px-2 text-[11px]"
-                            value={inputs.landmark || ""}
-                            onChange={(e) =>
-                              updateRowInput(
-                                order.id,
-                                "landmark",
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">Select Landmark</option>
-                            {landmarks.map((l) => (
-                              <option key={l} value={l}>
-                                {l}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
-                            value={inputs.payment_method || ""}
-                            onChange={(e) =>
-                              updateRowInput(
-                                order.id,
-                                "payment_method",
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">Method</option>
-                            {PAYMENT_METHODS.map((m) => (
-                              <option key={m} value={m}>
-                                {m}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
-                            value={inputs.delivery_status || ""}
-                            onChange={(e) =>
-                              updateRowInput(
-                                order.id,
-                                "delivery_status",
-                                e.target.value,
-                              )
-                            }
-                          >
-                            <option value="">Pending</option>
-                            {DELIVERY_STATUSES.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 w-24 text-[11px] cursor-pointer"
-                            placeholder="Note..."
-                            value={inputs.fom_comment || ""}
-                            readOnly
-                            onClick={() =>
-                              openCommentModal(
-                                order.id,
-                                inputs.fom_comment || "",
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            className="h-8 px-3"
-                            onClick={() => handleFomSubmit(order)}
-                            disabled={isSubmitting === order.id}
-                          >
-                            {isSubmitting === order.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Check className="h-3 w-3" />
-                            )}
-                            <span className="ml-1">Submit</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          title="New Orders Queue"
+          headers={columns}
+          rows={actionableOrdersByMerchant as any}
+          merchantOptions={merchantOptions}
+          filterMerchant={filterMerchant}
+          onFilterMerchantChange={setFilterMerchant}
+          searchPlaceholder="Search queue..."
+          showActions
+          renderRowActions={renderRowActions}
+        />
       </Card>
 
       <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>

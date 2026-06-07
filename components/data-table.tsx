@@ -1,0 +1,635 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Edit2, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import OrderSearchFilter from "@/components/order-search-filter";
+
+export type DataTableCellValue =
+  | string
+  | number
+  | React.ReactNode
+  | {
+      primary?: React.ReactNode;
+      secondary?: React.ReactNode;
+      value?: React.ReactNode;
+      detail?: React.ReactNode;
+    };
+
+export type DataTableRow = Record<string, DataTableCellValue | undefined>;
+
+export type DataTableColumn = {
+  key: string;
+  label: string;
+  width?: number | string;
+  resizable?: boolean;
+  editable?: boolean;
+  type?: "text" | "select" | "textarea";
+  options?: string[];
+  longText?: boolean;
+  render?: (
+    row: DataTableRow,
+    rowIndex: number,
+    isEditing: boolean,
+    editRow: DataTableRow | null,
+  ) => React.ReactNode;
+  className?: string;
+};
+
+interface DataTableProps {
+  title?: string;
+  headers: Array<string | DataTableColumn>;
+  rows: DataTableRow[];
+  showActions?: boolean;
+  actionLabel?: string;
+  rowKey?: string;
+  onRowSave?: (row: DataTableRow) => Promise<void> | void;
+  searchPlaceholder?: string;
+  disableSearch?: boolean;
+  renderRowActions?: (
+    row: DataTableRow,
+    rowIndex: number,
+    isEditing: boolean,
+    editRow: DataTableRow | null,
+  ) => React.ReactNode;
+  merchantOptions?: string[];
+  filterMerchant?: string | null;
+  onFilterMerchantChange?: (v: string | null) => void;
+}
+
+type DialogContext = {
+  rowIndex: number;
+  columnKey: string;
+  content: string;
+  editable: boolean;
+};
+
+const normalizeColumn = (column: string | DataTableColumn): DataTableColumn =>
+  typeof column === "string"
+    ? {
+        key: column,
+        label: column,
+        resizable: true,
+        editable: false,
+        type: "text",
+      }
+    : {
+        resizable: true,
+        editable: false,
+        type: "text",
+        ...column,
+      };
+
+const isDataTableCellObject = (
+  value: DataTableCellValue,
+): value is {
+  primary?: React.ReactNode;
+  secondary?: React.ReactNode;
+  value?: React.ReactNode;
+  detail?: React.ReactNode;
+} =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  ("primary" in value ||
+    "secondary" in value ||
+    "value" in value ||
+    "detail" in value);
+
+const getCellPrimary = (value: DataTableCellValue) => {
+  if (value == null) return "";
+  if (isDataTableCellObject(value)) {
+    return value.primary ?? value.value ?? value.detail ?? "";
+  }
+
+  return value;
+};
+
+const getCellSecondary = (value: DataTableCellValue) => {
+  if (value == null) return undefined;
+  if (isDataTableCellObject(value)) {
+    return value.secondary ?? value.detail ?? undefined;
+  }
+
+  return undefined;
+};
+
+const makeSearchString = (row: DataTableRow, columns: DataTableColumn[]) => {
+  return columns
+    .map((column) => {
+      const value = row[column.key];
+      const primary = getCellPrimary(value);
+      const secondary = getCellSecondary(value);
+      return `${primary ?? ""} ${secondary ?? ""}`;
+    })
+    .join(" ")
+    .toLowerCase();
+};
+
+export default function DataTable({
+  title,
+  headers,
+  rows,
+  showActions = false,
+  actionLabel = "Actions",
+  rowKey = "id",
+  onRowSave,
+  searchPlaceholder = "Search rows...",
+  disableSearch = false,
+  merchantOptions = [],
+  filterMerchant = null,
+  onFilterMerchantChange = () => {},
+  renderRowActions,
+}: DataTableProps) {
+  const columns = useMemo(() => headers.map(normalizeColumn), [headers]);
+
+  const [tableRows, setTableRows] = useState<DataTableRow[]>(rows);
+  const [searchText, setSearchText] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editRow, setEditRow] = useState<DataTableRow | null>(null);
+
+  // Drag-to-scroll state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
+
+  const handleDragMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+
+    // Prevent dragging if the user is interacting with interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("button") ||
+      target.closest("input") ||
+      target.closest("select") ||
+      target.closest("textarea") ||
+      target.getAttribute("role") === "separator"
+    ) {
+      return;
+    }
+
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      scrollLeft: scrollContainerRef.current.scrollLeft,
+    };
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!scrollContainerRef.current) return;
+      e.preventDefault();
+      const deltaX = e.clientX - dragStartRef.current.x;
+      scrollContainerRef.current.scrollLeft =
+        dragStartRef.current.scrollLeft - deltaX;
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+    };
+
+    // Ensure grabbing cursor and no text selection globally during drag
+    document.body.style.setProperty("cursor", "grabbing", "important");
+    document.body.style.setProperty("user-select", "none", "important");
+
+    window.addEventListener("mousemove", handleGlobalMouseMove);
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [isDragging]);
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      columns.map((column) => [
+        column.key,
+        column.width ? String(column.width) : "180px",
+      ]),
+    ),
+  );
+  const [dialogContext, setDialogContext] = useState<DialogContext | null>(
+    null,
+  );
+  const resizingRef = useRef<{
+    key: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  useEffect(() => {
+    setTableRows(rows);
+  }, [rows]);
+
+  useEffect(() => {
+    setColumnWidths(
+      Object.fromEntries(
+        columns.map((column) => [
+          column.key,
+          column.width ? String(column.width) : "180px",
+        ]),
+      ),
+    );
+  }, [columns]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!resizingRef.current) return;
+      event.preventDefault();
+      const { key, startX, startWidth } = resizingRef.current;
+      const delta = event.clientX - startX;
+      const nextWidth = Math.max(80, startWidth + delta);
+      setColumnWidths((prev) => ({ ...prev, [key]: `${nextWidth}px` }));
+    };
+
+    const handleMouseUp = () => {
+      resizingRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  const filteredRows = useMemo(() => {
+    if (!searchText.trim()) return tableRows;
+    const query = searchText.trim().toLowerCase();
+    return tableRows.filter((row) =>
+      makeSearchString(row, columns).includes(query),
+    );
+  }, [columns, searchText, tableRows]);
+
+  const startEditing = (index: number) => {
+    setEditingIndex(index);
+    setEditRow({ ...filteredRows[index] });
+  };
+
+  const cancelEditing = () => {
+    setEditingIndex(null);
+    setEditRow(null);
+  };
+
+  const saveEdit = async () => {
+    if (editingIndex === null || editRow == null) return;
+    const actualIndex = tableRows.findIndex((row, index) => {
+      const currentId = row[rowKey] ?? index;
+      const editingRowId = filteredRows[editingIndex][rowKey] ?? editingIndex;
+      return String(currentId) === String(editingRowId);
+    });
+
+    if (actualIndex === -1) return;
+    const nextRows = [...tableRows];
+    nextRows[actualIndex] = editRow;
+    setTableRows(nextRows);
+    setEditingIndex(null);
+    setEditRow(null);
+
+    if (onRowSave) {
+      await onRowSave(nextRows[actualIndex]);
+    }
+  };
+
+  const openDialog = (
+    rowIndex: number,
+    columnKey: string,
+    content: string,
+    editable: boolean,
+  ) => {
+    setDialogContext({ rowIndex, columnKey, content, editable });
+  };
+
+  const closeDialog = () => setDialogContext(null);
+
+  const handleDialogSave = () => {
+    if (!dialogContext || editingIndex === null || !editRow) return;
+    setEditRow((prev) =>
+      prev
+        ? {
+            ...prev,
+            [dialogContext.columnKey]: dialogContext.content,
+          }
+        : null,
+    );
+    closeDialog();
+  };
+
+  const handleCellChange = (columnKey: string, value: DataTableCellValue) => {
+    setEditRow((prev) => (prev ? { ...prev, [columnKey]: value } : prev));
+  };
+
+  const renderCellContent = (
+    row: DataTableRow,
+    column: DataTableColumn,
+    rowIndex: number,
+    isEditing: boolean,
+  ) => {
+    if (column.render) {
+      return column.render(row, rowIndex, isEditing, editRow);
+    }
+
+    const value = isEditing && editRow ? editRow[column.key] : row[column.key];
+    const primary = getCellPrimary(value);
+    const secondary = getCellSecondary(value);
+    const textValue = String(primary ?? "");
+    const longText = column.longText || column.type === "textarea";
+    const cellClass = cn(
+      "min-w-0 overflow-hidden text-xs truncate w-full block",
+      longText && "cursor-pointer text-foreground",
+    );
+
+    if (isEditing && column.editable) {
+      if (column.type === "select" && Array.isArray(column.options)) {
+        return (
+          <Select
+            value={textValue}
+            onValueChange={(val) => handleCellChange(column.key, val)}
+          >
+            <SelectTrigger className="w-full text-left">
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {column.options.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      }
+
+      if (column.type === "textarea") {
+        return (
+          <button
+            type="button"
+            className="text-left text-sm text-foreground"
+            onClick={() => openDialog(rowIndex, column.key, textValue, true)}
+          >
+            {textValue || "Click to edit"}
+          </button>
+        );
+      }
+
+      return (
+        <Input
+          value={textValue}
+          onChange={(event) => handleCellChange(column.key, event.target.value)}
+          className="w-full"
+        />
+      );
+    }
+
+    if (longText) {
+      return (
+        <button
+          type="button"
+          className={cn("text-left text-xs text-foreground w-full", cellClass)}
+          onClick={() => openDialog(rowIndex, column.key, textValue, false)}
+        >
+          <div className="truncate">{primary}</div>
+          {secondary ? (
+            <div className="text-[10px] text-muted-foreground truncate">
+              {secondary}
+            </div>
+          ) : null}
+        </button>
+      );
+    }
+
+    return (
+      <div className="text-xs truncate py-1">
+        <div className="truncate">{primary}</div>
+        {secondary ? (
+          <div className="text-[10px] text-muted-foreground truncate">
+            {secondary}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {title && <h2 className="text-lg font-semibold">{title}</h2>}
+
+      {!disableSearch ? (
+        <OrderSearchFilter
+          searchTerm={searchText}
+          onSearchTermChange={setSearchText}
+          merchantOptions={merchantOptions}
+          filterMerchant={filterMerchant}
+          onFilterMerchantChange={onFilterMerchantChange}
+        />
+      ) : null}
+
+      <div
+        ref={scrollContainerRef}
+        onMouseDown={handleDragMouseDown}
+        className={cn(
+          "overflow-x-auto border rounded-md select-none",
+          isDragging ? "cursor-grabbing" : "cursor-grab",
+          isDragging && "scroll-smooth-none", // Custom class or inline style to prevent transition lag
+        )}
+        style={isDragging ? { scrollBehavior: "auto" } : undefined}
+      >
+        <Table className="table-fixed w-full">
+          <TableHeader>
+            <TableRow>
+              {columns.map((column) => (
+                <TableHead
+                  key={column.key}
+                  style={{ width: columnWidths[column.key], minWidth: "80px" }}
+                  className="relative overflow-hidden bg-muted/40 border-r border-border h-9 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{column.label}</span>
+                  </div>
+                  {column.resizable ? (
+                    <div
+                      role="separator"
+                      onMouseDown={(event) => {
+                        resizingRef.current = {
+                          key: column.key,
+                          startX: event.clientX,
+                          startWidth:
+                            Number(
+                              columnWidths[column.key]?.replace("px", ""),
+                            ) || 180,
+                        };
+                      }}
+                      className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
+                    />
+                  ) : null}
+                </TableHead>
+              ))}
+              {showActions ? (
+                <TableHead className="text-left bg-muted/40 border-r border-border h-9 text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24">
+                  {actionLabel}
+                </TableHead>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredRows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={
+                    columns.length + (showActions || renderRowActions ? 1 : 0)
+                  }
+                  className="h-24 text-center text-muted-foreground text-xs"
+                >
+                  No orders available to be displayed
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredRows.map((row, rowIndex) => {
+                const isEditing = editingIndex === rowIndex;
+                const rowId = row[rowKey] ?? rowIndex;
+                return (
+                  <TableRow
+                    key={String(rowId)}
+                    className="hover:bg-muted/20 transition-colors border-b border-border group"
+                  >
+                    {columns.map((column) => (
+                      <TableCell
+                        key={`${String(rowId)}-${column.key}`}
+                        style={{
+                          width: columnWidths[column.key],
+                          minWidth: "80px",
+                        }}
+                        className={cn(
+                          "border-r border-border overflow-hidden py-1.5 px-3 group-hover:bg-transparent",
+                          column.longText || column.type === "textarea"
+                            ? "max-w-xs"
+                            : "bg-white",
+                        )}
+                      >
+                        {renderCellContent(row, column, rowIndex, isEditing)}
+                      </TableCell>
+                    ))}
+                    {renderRowActions ? (
+                      <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
+                        {renderRowActions(row, rowIndex, isEditing, editRow)}
+                      </TableCell>
+                    ) : showActions ? (
+                      <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
+                        {isEditing ? (
+                          <div className="flex justify-start gap-2">
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={saveEdit}
+                            >
+                              <Check className="h-4 w-4 text-emerald-500" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={cancelEditing}
+                            >
+                              <X className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-start gap-2">
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() => startEditing(rowIndex)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog
+        open={Boolean(dialogContext)}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Details</DialogTitle>
+            <DialogDescription>
+              {dialogContext?.editable
+                ? "Update the selected field and save the value."
+                : "Review the full field content."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {dialogContext?.editable ? (
+              <Textarea
+                value={dialogContext.content}
+                onChange={(event) =>
+                  setDialogContext((prev) =>
+                    prev ? { ...prev, content: event.target.value } : prev,
+                  )
+                }
+                className="min-h-40"
+              />
+            ) : (
+              <div className="whitespace-pre-wrap wrap-break-word text-sm text-foreground">
+                {dialogContext?.content}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {dialogContext?.editable ? (
+              <Button onClick={handleDialogSave}>Save</Button>
+            ) : null}
+            <Button variant="outline" onClick={closeDialog}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

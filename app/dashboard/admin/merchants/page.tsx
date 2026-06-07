@@ -5,14 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { Loader2, Plus, Edit2, Check, X } from "lucide-react";
 
 type MerchantRow = {
@@ -31,6 +24,37 @@ export default function MerchantsPage() {
   );
   const [editingName, setEditingName] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const columns: DataTableColumn[] = [
+    {
+      key: "name",
+      label: "Name",
+      render: (row) =>
+        editingMerchantId === row.id ? (
+          <Input
+            value={editingName}
+            onChange={(event) => setEditingName(event.target.value)}
+          />
+        ) : (
+          <span className="font-medium text-foreground">{row.name}</span>
+        ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <span
+          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+            row.is_active
+              ? "bg-emerald-100 text-emerald-900"
+              : "bg-destructive/10 text-destructive"
+          }`}
+        >
+          {row.is_active ? "Active" : "Deactivated"}
+        </span>
+      ),
+    },
+  ];
 
   const fetchMerchants = async () => {
     setLoading(true);
@@ -94,90 +118,43 @@ export default function MerchantsPage() {
     if (!editingName.trim()) return;
     setActionLoading(merchant.id);
     setError(null);
-
-    try {
-      const { error: updateError } = await supabase!
-        .from("merchants")
-        .update({ name: editingName.trim() })
-        .eq("id", merchant.id);
-      if (updateError) throw updateError;
-      setEditingMerchantId(null);
-      setEditingName("");
-      await fetchMerchants();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to rename merchant.",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const onToggleActive = async (merchant: MerchantRow) => {
-    setActionLoading(merchant.id);
-    setError(null);
-
-    try {
-      const { error: updateError } = await supabase!
-        .from("merchants")
-        .update({ is_active: !merchant.is_active })
-        .eq("id", merchant.id);
-      if (updateError) throw updateError;
-      await fetchMerchants();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to update merchant status.",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Merchant Management
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Add, rename, or deactivate merchants used across the system.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Card className="p-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Input
-            value={newMerchant}
-            onChange={(event) => setNewMerchant(event.target.value)}
-            placeholder="Add a new merchant"
-            className="w-full"
+          <DataTable
+            headers={columns}
+            rows={merchants}
+            searchPlaceholder="Search merchants..."
+            renderRowActions={(row) => (
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() =>
+                    editingMerchantId === row.id
+                      ? onUpdateMerchant(row)
+                      : (setEditingMerchantId(row.id), setEditingName(row.name))
+                  }
+                  title={
+                    editingMerchantId === row.id
+                      ? "Save merchant"
+                      : "Edit merchant"
+                  }
+                >
+                  {editingMerchantId === row.id ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Edit2 className="h-3 w-3" />
+                  )}
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => onToggleActive(row)}
+                  title="Toggle active"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
           />
-          <div className="flex items-end gap-2">
-            <Button onClick={onSaveMerchant} disabled={actionLoading === "new"}>
-              <Plus className="mr-2 h-4 w-4" /> Add merchant
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {loading ? (
-        <Card className="p-6 text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-4 text-sm text-muted-foreground">
-            Loading merchants...
-          </p>
-        </Card>
-      ) : error ? (
-        <Card className="p-6 bg-destructive/10 text-destructive">{error}</Card>
-      ) : (
-        <Card className="overflow-x-auto">
-          <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Name</TableHead>

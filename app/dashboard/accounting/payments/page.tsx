@@ -6,39 +6,112 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Order } from "@/lib/types";
 import { Loader2 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { type DataTableColumn } from "@/components/data-table";
 import OrderSearchFilter from "@/components/order-search-filter";
 
 export default function PaymentsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [foms, setFoms] = useState<any[]>([]);
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPayments = useCallback(async () => {
+  const columns: DataTableColumn[] = [
+    {
+      key: "id",
+      label: "Order ID",
+      render: (row) => `#${String(row.id).split("-")[0]}`,
+    },
+    {
+      key: "payment_verified_at",
+      label: "Verified At",
+      render: (row) =>
+        new Date(row.payment_verified_at as string).toLocaleString(),
+    },
+    {
+      key: "customer_name",
+      label: "Customer",
+      longText: true,
+      render: (row) => (row.customer_name as any) || "—",
+    },
+    {
+      key: "fom_assigned",
+      label: "FOM Assigned",
+      render: (row) =>
+        foms.find((user) => user.id === (row as any).fom_assigned)
+          ?.display_name || "—",
+    },
+    {
+      key: "total_amount",
+      label: "Order Amount",
+      render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
+    },
+    {
+      key: "landmark",
+      label: "Landmark",
+      render: (row) => (row.landmark as any) || "—",
+    },
+    {
+      key: "landmark_price",
+      label: "Landmark Price",
+      render: (row) =>
+        `₦${
+          landmarks
+            .find((l) => l.name === (row as any).landmark)
+            ?.price?.toLocaleString() || "—"
+        }`,
+    },
+    {
+      key: "rider_name",
+      label: "Rider",
+      longText: true,
+      render: (row) => (row.rider_name as any) || "—",
+    },
+    {
+      key: "payment_to_rider",
+      label: "Rider Fee",
+      render: (row) => `₦${Number(row.payment_to_rider || 0).toLocaleString()}`,
+    },
+    {
+      key: "payment_bank",
+      label: "Bank",
+      render: (row) => (row as any).payment_bank || "—",
+    },
+    {
+      key: "payment_method",
+      label: "Payment Method",
+      render: (row) => (row as any).payment_method || "—",
+    },
+  ];
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase!
-        .from("orders")
-        .select("*")
-        .eq("payment_confirmed", "Yes")
-        .order("updated_at", { ascending: false });
+      const [
+        { data: ordersData, error: fetchError },
+        { data: landmarksData },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .eq("payment_confirmed", true)
+          .order("updated_at", { ascending: false }),
+        supabase!.from("landmarks").select("*").eq("is_active", true),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
 
       if (fetchError) {
         throw fetchError;
       }
 
-      setOrders((data ?? []) as Order[]);
+      setOrders((ordersData ?? []) as Order[]);
+      setLandmarks((landmarksData ?? []) as any[]);
+      setFoms((fomUserData ?? []) as any[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load payments.");
     } finally {
@@ -46,7 +119,7 @@ export default function PaymentsPage() {
     }
   }, []);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchPayments, []);
+  useSupabaseRealtime([{ table: "landmarks", event: "*" }], fetchData, []);
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -84,50 +157,15 @@ export default function PaymentsPage() {
           No verified payment records found.
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <OrderSearchFilter
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
+        <Card className="overflow-hidden p-6">
+          <DataTable
+            headers={columns}
+            rows={filteredOrders as any}
+            searchPlaceholder="Search payments..."
             merchantOptions={[]}
             filterMerchant={filterMerchant}
             onFilterMerchantChange={setFilterMerchant}
           />
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Order Amount</TableHead>
-                <TableHead>Bank</TableHead>
-                <TableHead>Verified At</TableHead>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Payment Method</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">
-                    {order.customer_name}
-                  </TableCell>
-                  <TableCell>
-                    ₦{Number(order.total_amount).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-semibold text-primary">
-                    {(order as any).payment_bank}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(order.updated_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground uppercase">
-                    #{order.id.split("-")[0]}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {(order as any).payment_method}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </Card>
       )}
     </div>

@@ -123,4 +123,28 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  input,
+  textarea,
+  select,
+  .border-input {
+    border: 1px solid #c084fc !important; /* Stronger purple (Purple-400) always visible */
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  /* Enhances visibility when the user clicks into the field */
+  input:focus,
+  textarea:focus,
+  select:focus,
+  .border-input:focus-within {
+    border-color: #a855f7 !important; /* A deeper purple (Tailwind's purple-500) */
+    outline: none !important;
+    /* This adds a soft purple glow to make it even more obvious */
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+    /* Kill default tailwind ring shadows if they conflict */
+    --tw-ring-offset-width: 0px !important;
+    --tw-ring-width: 0px !important;
+  }
 }
