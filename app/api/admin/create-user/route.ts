@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         display_name: displayName,
         role,
         is_active: true,
-        is_deleted: true,
+        is_deleted: false,
         created_at: now,
         updated_at: now,
       },

@@ -154,11 +154,7 @@ export default function FOMOrdersPage() {
       {
         key: "fom_assigned_at",
         label: "Fom Assigned At",
-        render: (row) =>
-          new Date(row.fom_assigned_at as any).toLocaleString([], {
-            dateStyle: "short",
-            timeStyle: "short",
-          }),
+        render: (row) => (row as any).fom_assigned_at,
       },
       {
         key: "customer",
@@ -200,11 +196,7 @@ export default function FOMOrdersPage() {
       {
         key: "rider_assigned_at",
         label: "Rider Assigned At",
-        render: (row) =>
-          new Date(row.rider_assigned_at as any).toLocaleString([], {
-            dateStyle: "short",
-            timeStyle: "short",
-          }),
+        render: (row) => (row as any).rider_assigned_at,
       },
       {
         key: "payment_to_rider",

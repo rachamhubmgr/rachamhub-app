@@ -117,7 +117,7 @@ export default function PaymentsPage() {
     {
       key: "payment_bank",
       label: "Bank",
-      render: (row) => (row as any).payment_bank || "—",
+      render: (row) => (row as any).bank || "—",
     },
     {
       key: "payment_method",

@@ -39,6 +39,7 @@ export default function UserManagementPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [showDeletedUsers, setShowDeletedUsers] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
     email: "",
     display_name: "",
@@ -140,6 +141,7 @@ export default function UserManagementPage() {
       return;
     }
 
+    setIsSaving(true);
     try {
       if (editingUser) {
         const { error } = await supabase!
@@ -182,6 +184,8 @@ export default function UserManagementPage() {
       fetchUsers();
     } catch (err) {
       toast.error("Action failed");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -396,10 +400,25 @@ export default function UserManagementPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsModalOpen(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveUser}>Save Changes</Button>
+            <Button onClick={handleSaveUser} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingUser ? "Saving..." : "Creating..."}
+                </>
+              ) : editingUser ? (
+                "Save Changes"
+              ) : (
+                "Create User"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

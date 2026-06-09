@@ -21,7 +21,7 @@ export default function InvoicesPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifications, setVerifications] = useState<
-    Record<string, { confirmed: string; bank: string }>
+    Record<string, { confirmed: string }>
   >({});
 
   const fetchData = useCallback(async () => {
@@ -87,8 +87,8 @@ export default function InvoicesPage() {
   const confirmPayment = useCallback(
     async (orderId: string) => {
       const verify = verifications[orderId];
-      if (!verify?.confirmed || !verify?.bank) {
-        toast.error("Please select both Confirmed status and Bank account.");
+      if (verify.confirmed === "false") {
+        toast.error("Please confirm payment before proceeding.");
         return;
       }
 
@@ -97,9 +97,7 @@ export default function InvoicesPage() {
         const { error: updateError } = await supabase!
           .from("orders")
           .update({
-            payment_confirmed: true,
-            payment_verified_at: new Date().toISOString(),
-            bank: verify.bank,
+            payment_confirmed: verify.confirmed === "true",
             status: "accounting",
             updated_at: new Date().toISOString(),
           })
@@ -119,7 +117,7 @@ export default function InvoicesPage() {
         setActionLoading(null);
       }
     },
-    [verifications],
+    [verifications, fetchData],
   );
 
   const columns = useMemo<DataTableColumn[]>(
@@ -208,6 +206,34 @@ export default function InvoicesPage() {
         key: "bank",
         label: "Bank",
         render: (row) => (row as any).bank || "—",
+      },
+      {
+        key: "payment_verification",
+        label: "Verify Payment",
+        render: (row) => {
+          const orderId = String(row.id);
+          const currentVerification = verifications[orderId] || {
+            confirmed: "",
+          };
+
+          return (
+            <div className="flex flex-col gap-2 py-1 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Confirmed:</span>
+                <select
+                  className="h-7 rounded-md border border-input bg-background px-1 text-[10px]"
+                  value={currentVerification.confirmed}
+                  onChange={(e) =>
+                    updateVerify(orderId, "confirmed", e.target.value)
+                  }
+                >
+                  <option value="">Select</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+            </div>
+          );
+        },
       },
       {
         key: "action",

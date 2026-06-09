@@ -17,7 +17,26 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Package, Search, Edit2, Check, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import OrderSearchFilter from "@/components/order-search-filter";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  shipped: "Shipped",
+  shelved: "Shelved",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  returned: "Returned",
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-purple-100 text-purple-900",
+  shipped: "bg-blue-100 text-blue-900",
+  shelved: "bg-yellow-100 text-yellow-900",
+  delivered: "bg-emerald-100 text-emerald-900",
+  cancelled: "bg-slate-100 text-slate-900",
+  returned: "bg-orange-100 text-orange-900",
+};
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -85,6 +104,10 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
   }, []);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
@@ -325,6 +348,22 @@ export default function OrdersPage() {
         },
       },
       {
+        key: "fom_delivery_status",
+        label: "Delivery Status",
+        render: (row) => {
+          return (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                STATUS_STYLES[(row as any).fom_delivery_status || "pending"],
+              )}
+            >
+              {(row as any).fom_delivery_status || "pending"}
+            </span>
+          );
+        },
+      },
+      {
         key: "extracted_by",
         label: "Entered By",
         render: (row) =>
@@ -332,7 +371,7 @@ export default function OrdersPage() {
             ?.display_name || "—",
       },
     ],
-    [ccUsers, editingId, editForm, openModal],
+    [ccUsers, editingId, editForm, openModal, STATUS_LABELS, STATUS_STYLES],
   );
 
   const handleSave = async () => {
@@ -341,6 +380,13 @@ export default function OrdersPage() {
     setIsSaving(true);
     setError(null);
 
+    if (editForm.status !== "customer_service") {
+      toast.error(
+        "Order cannot be updated as it's no longer in 'Customer Service' status.",
+      );
+      setIsSaving(false);
+      return;
+    }
     try {
       const { error: updateError } = await supabase!
         .from("orders")
