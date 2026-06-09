@@ -76,8 +76,6 @@ export async function POST(request: Request) {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    console.log("[Gemini API] Raw response:", responseText);
-
     // Parse JSON response
     let extractedData: ExtractedOrder;
     try {
@@ -110,8 +108,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    console.log("[Gemini API] Successfully extracted order:", extractedData);
 
     const response: GeminiResponse = {
       success: true,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/components/auth-context";
 import {
   DollarSign,
   TrendingUp,
@@ -30,6 +30,10 @@ export default function AccountingDashboard() {
       .order("created_at", { ascending: false });
     setOrders((data ?? []) as Order[]);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchAccountingOrders();
   }, []);
 
   useSupabaseRealtime(

@@ -30,6 +30,7 @@ export interface UserProfile {
   role: UserRole;
   department?: string;
   isActive: boolean;
+  isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;

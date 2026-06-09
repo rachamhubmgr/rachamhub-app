@@ -397,7 +397,6 @@ export default function WarehouseOrdersPage() {
         .eq("id", editForm.id);
 
       if (updateError) {
-        console.log(updateError);
         throw updateError;
       }
 

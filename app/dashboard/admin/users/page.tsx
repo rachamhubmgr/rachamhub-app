@@ -14,11 +14,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, UserPlus, Edit, ShieldAlert, Key } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Loader2,
+  UserPlus,
+  Edit,
+  ShieldAlert,
+  Key,
+  Trash2,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -28,6 +36,31 @@ export default function UserManagementPage() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] = useState<any>(null);
   const [passwordValue, setPasswordValue] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [showDeletedUsers, setShowDeletedUsers] = useState(false);
+  const [form, setForm] = useState({
+    email: "",
+    display_name: "",
+    role: "fom",
+    is_active: true,
+  });
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase!
+      .from("users")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) toast.error("Error fetching users");
+    else setUsers(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const columns: DataTableColumn[] = [
     {
@@ -57,41 +90,33 @@ export default function UserManagementPage() {
       label: "Status",
       render: (row) => (
         <Badge
-          variant={row.is_active !== false ? "default" : "destructive"}
+          variant={
+            row.is_deleted
+              ? "destructive"
+              : row.is_active !== false
+                ? "default"
+                : "secondary"
+          }
           className="text-[10px]"
         >
-          {row.is_active !== false ? "Active" : "Deactivated"}
+          {row.is_deleted
+            ? "Deleted"
+            : row.is_active !== false
+              ? "Active"
+              : "Inactive"}
         </Badge>
       ),
     },
     {
       key: "created_at",
       label: "Created",
-      render: (row) => new Date((row as any).created_at).toLocaleDateString(),
+      render: (row) =>
+        new Date((row as any).created_at).toLocaleString([], {
+          dateStyle: "short",
+          timeStyle: "short",
+        }),
     },
   ];
-  const [form, setForm] = useState({
-    email: "",
-    display_name: "",
-    role: "fom",
-    is_active: true,
-  });
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase!
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) toast.error("Error fetching users");
-    else setUsers(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
 
   const handleOpenModal = (user: any = null) => {
     if (user) {
@@ -209,6 +234,32 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleConfirmDelete = (user: any) => {
+    setUserToDelete(user);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      const { error } = await supabase!
+        .from("users")
+        .update({ is_deleted: true, updated_at: new Date().toISOString() })
+        .eq("id", userToDelete.id);
+
+      if (error) throw error;
+
+      toast.success(`User ${userToDelete.display_name} marked as deleted.`);
+      setDeleteModalOpen(false);
+      setUserToDelete(null);
+      fetchUsers(); // Refresh the list
+    } catch (err) {
+      toast.error("Failed to delete user.");
+      console.error("Error deleting user:", err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -223,36 +274,71 @@ export default function UserManagementPage() {
         </Button>
       </div>
 
+      <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border/50">
+        <div className="space-y-0.5">
+          <Label htmlFor="show-deleted" className="text-sm font-medium">
+            Show Deleted Users
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Toggle to view active or archived user accounts.
+          </p>
+        </div>
+        <div className="flex items-center">
+          <Switch
+            id="show-deleted"
+            checked={showDeletedUsers}
+            onCheckedChange={setShowDeletedUsers}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+      </div>
+
       <Card className="p-6">
         {loading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="animate-spin h-8 w-8 text-primary" />
           </div>
+        ) : showDeletedUsers ? (
+          <DataTable
+            headers={columns}
+            rows={users.filter((user) => user.is_deleted === true) as any}
+            searchPlaceholder="Search users..."
+          />
         ) : (
           <DataTable
             headers={columns}
-            rows={users as any}
+            rows={users.filter((user) => user.is_deleted === false) as any}
             searchPlaceholder="Search users..."
-            showActions
-            renderRowActions={(row) => (
-              <div className="flex justify-end gap-2">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => handleResetPassword(row)}
-                  title="Reset Password"
-                >
-                  <Key className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => handleOpenModal(row)}
-                >
-                  <Edit className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
+            showActions={!showDeletedUsers}
+            renderRowActions={(row) =>
+              !row.is_deleted && (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => handleResetPassword(row)}
+                    title="Reset Password"
+                  >
+                    <Key className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => handleOpenModal(row)}
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => handleConfirmDelete(row)}
+                    title="Delete User"
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              )
+            }
           />
         )}
       </Card>
@@ -346,6 +432,29 @@ export default function UserManagementPage() {
               Cancel
             </Button>
             <Button onClick={submitNewPassword}>Set Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark{" "}
+              <span className="font-medium text-foreground">
+                {userToDelete?.display_name} ({userToDelete?.email})
+              </span>{" "}
+              as deleted? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteUser}>
+              <Trash2 className="mr-2 h-4 w-4" /> Confirm Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider } from "@/components/auth-context";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 

@@ -92,22 +92,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Audit the admin action
-    // try {
-    //   await adminSupabase.from("admin_audit").insert([
-    //     {
-    //       admin_id: callerId,
-    //       action: "set_password",
-    //       target_user_id: targetUserId,
-    //       target_email: email ?? null,
-    //       details: { method: "admin_set_password" },
-    //       created_at: new Date().toISOString(),
-    //     },
-    //   ]);
-    // } catch (auditErr) {
-    //   console.error("Failed to write admin audit record:", auditErr);
-    // }
-
     return NextResponse.json({ success: true, user: data?.user ?? null });
   } catch (err) {
     const message =

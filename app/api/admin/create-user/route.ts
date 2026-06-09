@@ -76,8 +76,6 @@ export async function POST(request: Request) {
         email_confirm: true,
       });
 
-    console.log(createUserError);
-
     if (createUserError) {
       return NextResponse.json(
         { error: createUserError.message || "Unable to create auth user." },
@@ -101,6 +99,7 @@ export async function POST(request: Request) {
         display_name: displayName,
         role,
         is_active: true,
+        is_deleted: true,
         created_at: now,
         updated_at: now,
       },

@@ -108,19 +108,6 @@ export default function AdminSettingsPage() {
     fetchMerchants();
     fetchRiders();
     fetchLandmarks();
-    // load system settings
-    (async () => {
-      const { data } = await supabase!.from("settings").select("key, value");
-      if (data) {
-        const map: any = {};
-        data.forEach((r: any) => (map[r.key] = r.value));
-        setSettings({
-          order_prefix: map.order_prefix ?? settings.order_prefix,
-          session_timeout: map.session_timeout ?? settings.session_timeout,
-          fom_names: map.fom_names ?? settings.fom_names,
-        });
-      }
-    })();
   }, []);
 
   const handleAddMerchant = async () => {

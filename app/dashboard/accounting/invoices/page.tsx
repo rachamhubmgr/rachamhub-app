@@ -24,6 +24,53 @@ export default function InvoicesPage() {
     Record<string, { confirmed: string; bank: string }>
   >({});
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [
+        { data: ordersData, error: fetchError },
+        { data: merchantsData },
+        { data: landmarksData },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .eq("status", "fom")
+          .neq("rider_name", null)
+          .order("created_at", { ascending: false }),
+        supabase!
+          .from("merchants")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!.from("landmarks").select("*").eq("is_active", true),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
+
+      if (fetchError) throw fetchError;
+
+      if (merchantsData)
+        setMerchantOptions(merchantsData.map((m: any) => m.name));
+      setOrders((ordersData ?? []) as Order[]);
+      setLandmarks((landmarksData ?? []) as any[]);
+      setFoms((fomUserData ?? []) as any[]);
+      console.log(fomUserData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load invoices.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, []);
+
   const updateVerify = useCallback(
     (id: string, field: "confirmed" | "bank", value: string) => {
       setVerifications((prev) => ({
@@ -181,50 +228,15 @@ export default function InvoicesPage() {
         ),
       },
     ],
-    [verifications, actionLoading, updateVerify, confirmPayment],
+    [
+      verifications,
+      actionLoading,
+      updateVerify,
+      confirmPayment,
+      foms,
+      landmarks,
+    ],
   );
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [
-        { data: ordersData, error: fetchError },
-        { data: merchantsData },
-        { data: landmarksData },
-        { data: fomUserData },
-      ] = await Promise.all([
-        supabase!
-          .from("orders")
-          .select("*")
-          .eq("status", "fom")
-          .neq("rider_name", null)
-          .order("created_at", { ascending: false }),
-        supabase!
-          .from("merchants")
-          .select("name")
-          .eq("is_active", true)
-          .order("name"),
-        supabase!.from("landmarks").select("*").eq("is_active", true),
-        supabase!.from("users").select("id, display_name").eq("role", "fom"),
-      ]);
-
-      if (fetchError) throw fetchError;
-
-      if (merchantsData)
-        setMerchantOptions(merchantsData.map((m: any) => m.name));
-      setOrders((ordersData ?? []) as Order[]);
-      setLandmarks((landmarksData ?? []) as any[]);
-      setFoms((fomUserData ?? []) as any[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load invoices.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, []);
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();

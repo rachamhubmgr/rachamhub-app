@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/components/auth-context";
 import {
   Package,
   TrendingUp,
@@ -205,7 +205,11 @@ export default function FOMDashboard() {
       {
         key: "fom_assigned_at",
         label: "Fom Assigned At",
-        render: (row) => (row as any).fom_assigned_at,
+        render: (row) =>
+          new Date(row.fom_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "customer",

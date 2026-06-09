@@ -1,51 +1,90 @@
-"use client";
-
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  RealtimeChannel,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 
-export type SupabaseRealtimeEvent = "INSERT" | "UPDATE" | "DELETE" | "*";
-
-export interface RealtimeSubscription {
+interface RealtimeSubscriptionConfig {
   table: string;
-  event?: SupabaseRealtimeEvent;
+  event: "INSERT" | "UPDATE" | "DELETE" | "*";
   schema?: string;
+  filter?: string;
 }
 
 export function useSupabaseRealtime(
-  subscriptions: RealtimeSubscription[],
-  callback: () => void,
-  deps: unknown[] = [],
+  subscriptions: RealtimeSubscriptionConfig[],
+  callback: () => void | Promise<void>,
+  deps: React.DependencyList = [],
 ) {
+  const callbackRef = useRef(callback);
+
+  // Update the ref whenever the callback changes, but don't include it in useEffect's deps
+  // to prevent re-subscription if only the callback changes.
   useEffect(() => {
-    if (subscriptions.length === 0) {
-      callback();
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if (!supabase) {
+      console.error("Supabase client is not initialized for realtime hook.");
       return;
     }
 
-    callback();
+    const channels: RealtimeChannel[] = [];
 
-    const channelName = subscriptions
-      .map((sub) => `${sub.table}-${sub.event ?? "*"}`)
-      .join("-");
+    subscriptions.forEach((subConfig, index) => {
+      // Ensure channel names are unique and descriptive
+      const channelName = `realtime_channel_${subConfig.table}_${subConfig.event}_${subConfig.filter || "nofilter"}_${index}`;
 
-    const channel = supabase!.channel(channelName);
-
-    subscriptions.forEach((sub) => {
-      channel.on(
-        "postgres_changes",
-        {
-          event: sub.event ?? "*",
-          schema: sub.schema ?? "public",
-          table: sub.table,
-        },
-        callback,
-      );
+      const channel = supabase!
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: subConfig.event,
+            schema: subConfig.schema || "public",
+            table: subConfig.table,
+            filter: subConfig.filter,
+          } as any,
+          (payload: RealtimePostgresChangesPayload<any>) => {
+            console.log(
+              `[Supabase Realtime] Event received for ${subConfig.table}:`,
+              payload,
+            );
+            callbackRef.current(); // Use the ref to call the latest callback
+          },
+        )
+        .subscribe((status, err) => {
+          if (status === "SUBSCRIBED") {
+            console.log(
+              `[Supabase Realtime] Subscribed to ${subConfig.table} (event: ${subConfig.event})`,
+            );
+          } else if (status === "CHANNEL_ERROR") {
+            console.error(
+              `[Supabase Realtime] Error subscribing to ${subConfig.table}:`,
+              err,
+            );
+          } else if (status === "TIMED_OUT") {
+            console.warn(
+              `[Supabase Realtime] Subscription timed out for ${subConfig.table}.`,
+            );
+          } else if (status === "CLOSED") {
+            console.warn(
+              `[Supabase Realtime] Realtime channel closed for ${subConfig.table}.`,
+            );
+          }
+        });
+      channels.push(channel);
     });
 
-    channel.subscribe();
-
     return () => {
-      supabase!.removeChannel(channel);
+      channels.forEach((channel) => {
+        console.log(
+          `[Supabase Realtime] Unsubscribing from channel: ${channel.topic}`,
+        );
+        supabase!.removeChannel(channel);
+      });
     };
-  }, [callback, JSON.stringify(subscriptions), ...deps]);
+  }, [supabase, ...deps, JSON.stringify(subscriptions)]); // Deep compare subscriptions config
 }

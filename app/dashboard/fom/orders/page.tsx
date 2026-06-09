@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/components/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +81,11 @@ export default function FOMOrdersPage() {
     }
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) return;
+    fetchOrders();
+  }, [user?.uid]);
+
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
     user?.uid,
   ]);
@@ -149,7 +154,11 @@ export default function FOMOrdersPage() {
       {
         key: "fom_assigned_at",
         label: "Fom Assigned At",
-        render: (row) => (row as any).fom_assigned_at,
+        render: (row) =>
+          new Date(row.fom_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "customer",
@@ -191,7 +200,11 @@ export default function FOMOrdersPage() {
       {
         key: "rider_assigned_at",
         label: "Rider Assigned At",
-        render: (row) => (row as any).rider_assigned_at,
+        render: (row) =>
+          new Date(row.rider_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "payment_to_rider",

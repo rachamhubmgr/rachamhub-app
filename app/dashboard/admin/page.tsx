@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/components/auth-context";
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import {
@@ -34,6 +34,10 @@ export default function AdminDashboard() {
     setOrders((orderData ?? []) as Order[]);
     setUsersCount((userData ?? []).length);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchAdminMetrics();
   }, []);
 
   useSupabaseRealtime(

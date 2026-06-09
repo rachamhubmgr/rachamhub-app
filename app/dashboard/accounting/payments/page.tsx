@@ -18,6 +18,43 @@ export default function PaymentsPage() {
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [
+        { data: ordersData, error: fetchError },
+        { data: landmarksData },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .eq("payment_confirmed", true)
+          .order("updated_at", { ascending: false }),
+        supabase!.from("landmarks").select("*").eq("is_active", true),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      setOrders((ordersData ?? []) as Order[]);
+      setLandmarks((landmarksData ?? []) as any[]);
+      setFoms((fomUserData ?? []) as any[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load payments.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const columns: DataTableColumn[] = [
     {
       key: "id",
@@ -28,7 +65,10 @@ export default function PaymentsPage() {
       key: "payment_verified_at",
       label: "Verified At",
       render: (row) =>
-        new Date(row.payment_verified_at as string).toLocaleString(),
+        new Date(row.payment_verified_at as string).toLocaleString([], {
+          dateStyle: "short",
+          timeStyle: "short",
+        }),
     },
     {
       key: "customer_name",
@@ -85,39 +125,6 @@ export default function PaymentsPage() {
       render: (row) => (row as any).payment_method || "—",
     },
   ];
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [
-        { data: ordersData, error: fetchError },
-        { data: landmarksData },
-        { data: fomUserData },
-      ] = await Promise.all([
-        supabase!
-          .from("orders")
-          .select("*")
-          .eq("payment_confirmed", true)
-          .order("updated_at", { ascending: false }),
-        supabase!.from("landmarks").select("*").eq("is_active", true),
-        supabase!.from("users").select("id, display_name").eq("role", "fom"),
-      ]);
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      setOrders((ordersData ?? []) as Order[]);
-      setLandmarks((landmarksData ?? []) as any[]);
-      setFoms((fomUserData ?? []) as any[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load payments.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useSupabaseRealtime([{ table: "landmarks", event: "*" }], fetchData, []);
 

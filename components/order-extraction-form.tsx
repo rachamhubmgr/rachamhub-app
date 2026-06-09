@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/components/auth-context";
 import { ExtractedOrder, GeminiResponse } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { AlertCircle, CheckCircle2, Loader2, Zap } from "lucide-react";
@@ -90,8 +90,6 @@ export default function OrderExtractionForm() {
         throw new Error(result.error || "No order data extracted");
       }
 
-      console.log(result.data);
-
       setReviewData(result.data);
       setIsReviewOpen(true);
       setSuccess(false);
@@ -119,7 +117,6 @@ export default function OrderExtractionForm() {
 
     try {
       if (!supabase) throw new Error("Supabase client is not initialized.");
-      console.log("Saving extracted order to Supabase...");
 
       const orderData = {
         customer_name: orderToSave.customerName,
@@ -140,7 +137,6 @@ export default function OrderExtractionForm() {
       const { error } = await supabase.from("orders").insert([orderData]);
       if (error) throw error;
 
-      console.log("Order saved successfully");
       setSuccess(true);
       setIsReviewOpen(false);
       setReviewData(null);

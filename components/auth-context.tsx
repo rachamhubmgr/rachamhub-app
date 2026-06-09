@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   // Fetch user details from Supabase `users` table
   const fetchUserDetails = async (
     supaUserId: string,
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: row.display_name || row.displayName || "User",
         role: row.role || ("customer_service" as UserRole),
         isActive: typeof row.is_active === "boolean" ? row.is_active : true,
+        isDeleted: typeof row.is_deleted === "boolean" ? row.is_deleted : false,
         createdAt: row.created_at || new Date().toISOString(),
         updatedAt: row.updated_at || new Date().toISOString(),
         lastLogin: row.last_login || undefined,
@@ -183,6 +185,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!supabase) throw new Error("Supabase client is not initialized.");
       setError(null);
       setLoading(true);
+
+      // Check if user is active before attempting sign-in
+      const { data: activeCheck } = await supabase
+        .from("users")
+        .select("is_active")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (activeCheck && activeCheck.is_active === false) {
+        throw new Error(
+          "Your account is inactive. Please contact administrator.",
+        );
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -192,8 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supaUser = data.user;
       if (supaUser) {
         const userDetails = await fetchUserDetails(supaUser.id);
-        if (userDetails) setUser(createAuthUser(userDetails));
-        else {
+        if (userDetails) {
+          if (!userDetails.isActive) {
+            await supabase.auth.signOut();
+            throw new Error(
+              "Your account is inactive. Please contact administrator.",
+            );
+          }
+          setUser(createAuthUser(userDetails));
+        } else {
           setUser(null);
           setError("User profile not found. Please contact administrator.");
           await supabase.auth.signOut();
@@ -250,6 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName,
           role,
           isActive: true,
+          isDeleted: true,
           createdAt: now,
           updatedAt: now,
         };

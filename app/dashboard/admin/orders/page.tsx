@@ -182,6 +182,10 @@ export default function AdminOrdersPage() {
     }
   }, [endDate, startDate]);
 
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
     startDate,
     endDate,
