@@ -65,11 +65,17 @@ export default function InventoryPage() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id || "").split("-")[0]}`,
+        getSearchableText: (row) => String(row.id || "").split("-")[0],
       },
       {
         key: "created_at",
         label: "Created At",
         render: (row) =>
+          new Date(row.created_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        getSearchableText: (row) =>
           new Date(row.created_at as any).toLocaleString([], {
             dateStyle: "short",
             timeStyle: "short",
@@ -80,18 +86,22 @@ export default function InventoryPage() {
         label: "Customer",
         longText: true,
         render: (row) => (row.customer_name as any) || "—",
+        getSearchableText: (row) => (row.customer_name as any) || "",
       },
       {
         key: "delivery_address",
         label: "Delivery Address",
         longText: true,
         render: (row) => (row.delivery_address as any) || "—",
+        getSearchableText: (row) => (row.delivery_address as any) || "",
       },
       {
         key: "phone_numbers",
         label: "Phone",
         render: (row) =>
           ((row.phone_numbers as string[]) || []).join(", ") || "—",
+        getSearchableText: (row) =>
+          ((row.phone_numbers as string[]) || []).join(", "),
       },
       {
         key: "items",
@@ -100,12 +110,15 @@ export default function InventoryPage() {
         render: (row) =>
           ((row.items as any[]) || [])
             .map((item: any) => `${item.quantity}x ${item.name}`)
-            .join(", "),
+            .join(", "), // Display
+        getSearchableText: (row) =>
+          ((row.items as any[]) || []).map((item: any) => item.name).join(", "), // Searchable text
       },
       {
         key: "merchant",
         label: "Merchant",
         render: (row) => (row.merchant as any) || "—",
+        getSearchableText: (row) => (row.merchant as any) || "",
       },
       {
         key: "warehouse_delivery_status",
@@ -143,11 +156,14 @@ export default function InventoryPage() {
               {(row.warehouse_delivery_status as any) || "pending"}
             </span>
           ),
+        getSearchableText: (row) =>
+          (row.warehouse_delivery_status as any) || "pending",
       },
       {
         key: "inventory_status",
         label: "Inventory Status",
         render: (row) => (row as any).inventory_status || "unpacked",
+        getSearchableText: (row) => (row as any).inventory_status || "unpacked",
       },
       {
         key: "fom_assigned",
@@ -155,6 +171,9 @@ export default function InventoryPage() {
         render: (row) =>
           fomUsers.find((user) => user.id === (row as any).fom_assigned)
             ?.display_name || "—",
+        getSearchableText: (row) =>
+          fomUsers.find((user) => user.id === (row as any).fom_assigned)
+            ?.display_name || "",
       },
       {
         key: "warehouse_comment",
@@ -176,6 +195,7 @@ export default function InventoryPage() {
           ) : (
             (row as any).warehouse_comment || "—"
           ),
+        getSearchableText: (row) => (row as any).warehouse_comment || "",
       },
     ],
     [editingId, editForm, fomUsers, openCommentModal],

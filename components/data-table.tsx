@@ -53,8 +53,10 @@ export type DataTableColumn = {
   type?: "text" | "select" | "textarea";
   options?: string[];
   longText?: boolean;
+  getSearchableText?: (row: DataTableRow) => string;
   render?: (
     row: DataTableRow,
+    // The `rowIndex` and `isEditing` parameters are not used in this context, but are kept for compatibility.
     rowIndex: number,
     isEditing: boolean,
     editRow: DataTableRow | null,
@@ -143,9 +145,15 @@ const getCellSecondary = (value: DataTableCellValue) => {
 const makeSearchString = (row: DataTableRow, columns: DataTableColumn[]) => {
   return columns
     .map((column) => {
-      const value = row[column.key];
-      const primary = getCellPrimary(value);
-      const secondary = getCellSecondary(value);
+      // For each column, determine its searchable text
+      if (column.getSearchableText) {
+        // If a custom searchable text function is provided, use it
+        return column.getSearchableText(row);
+      }
+      // Otherwise, fall back to extracting primary and secondary text from the row value
+      const value = row[column.key]; // Get the raw value from the row
+      const primary = getCellPrimary(value); // Extract primary text
+      const secondary = getCellSecondary(value); // Extract secondary text
       return `${primary ?? ""} ${secondary ?? ""}`;
     })
     .join(" ")

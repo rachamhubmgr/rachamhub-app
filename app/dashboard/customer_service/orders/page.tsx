@@ -152,6 +152,7 @@ export default function OrdersPage() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id || "").split("-")[0]}`,
+        getSearchableText: (row) => String(row.id || "").split("-")[0],
       },
       {
         key: "created_at",
@@ -159,6 +160,14 @@ export default function OrdersPage() {
         render: (row) => {
           const createdAt = row.created_at as string;
           if (!createdAt) return "—";
+          return new Date(createdAt).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          });
+        },
+        getSearchableText: (row) => {
+          const createdAt = row.created_at as string;
+          if (!createdAt) return "";
           return new Date(createdAt).toLocaleString([], {
             dateStyle: "short",
             timeStyle: "short",
@@ -362,13 +371,18 @@ export default function OrdersPage() {
             </span>
           );
         },
+        getSearchableText: (row) =>
+          (row as any).fom_delivery_status || "pending",
       },
       {
         key: "extracted_by",
         label: "Entered By",
         render: (row) =>
           ccUsers.find((u) => u.id === (row.extracted_by as any))
-            ?.display_name || "—",
+            ?.display_name || "—", // Display
+        getSearchableText: (row) =>
+          ccUsers.find((u) => u.id === (row.extracted_by as any))
+            ?.display_name || "", // Searchable text
       },
     ],
     [ccUsers, editingId, editForm, openModal, STATUS_LABELS, STATUS_STYLES],

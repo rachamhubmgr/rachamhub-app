@@ -60,11 +60,17 @@ export default function PaymentsPage() {
       key: "id",
       label: "Order ID",
       render: (row) => `#${String(row.id).split("-")[0]}`,
+      getSearchableText: (row) => String(row.id).split("-")[0],
     },
     {
       key: "payment_verified_at",
       label: "Verified At",
       render: (row) =>
+        new Date(row.payment_verified_at as string).toLocaleString([], {
+          dateStyle: "short",
+          timeStyle: "short",
+        }),
+      getSearchableText: (row) =>
         new Date(row.payment_verified_at as string).toLocaleString([], {
           dateStyle: "short",
           timeStyle: "short",
@@ -75,6 +81,7 @@ export default function PaymentsPage() {
       label: "Customer",
       longText: true,
       render: (row) => (row.customer_name as any) || "—",
+      getSearchableText: (row) => (row.customer_name as any) || "",
     },
     {
       key: "fom_assigned",
@@ -82,16 +89,21 @@ export default function PaymentsPage() {
       render: (row) =>
         foms.find((user) => user.id === (row as any).fom_assigned)
           ?.display_name || "—",
+      getSearchableText: (row) =>
+        foms.find((user) => user.id === (row as any).fom_assigned)
+          ?.display_name || "",
     },
     {
       key: "total_amount",
       label: "Order Amount",
       render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
+      getSearchableText: (row) => String(Number(row.total_amount || 0)),
     },
     {
       key: "landmark",
       label: "Landmark",
       render: (row) => (row.landmark as any) || "—",
+      getSearchableText: (row) => (row.landmark as any) || "",
     },
     {
       key: "landmark_price",
@@ -102,27 +114,35 @@ export default function PaymentsPage() {
             .find((l) => l.name === (row as any).landmark)
             ?.price?.toLocaleString() || "—"
         }`,
+      getSearchableText: (row) =>
+        String(
+          landmarks.find((l) => l.name === (row as any).landmark)?.price || "",
+        ),
     },
     {
       key: "rider_name",
       label: "Rider",
       longText: true,
       render: (row) => (row.rider_name as any) || "—",
+      getSearchableText: (row) => (row.rider_name as any) || "",
     },
     {
       key: "payment_to_rider",
       label: "Rider Fee",
       render: (row) => `₦${Number(row.payment_to_rider || 0).toLocaleString()}`,
+      getSearchableText: (row) => String(Number(row.payment_to_rider || 0)),
     },
     {
       key: "payment_bank",
       label: "Bank",
       render: (row) => (row as any).bank || "—",
+      getSearchableText: (row) => (row.bank as any) || "",
     },
     {
       key: "payment_method",
       label: "Payment Method",
       render: (row) => (row as any).payment_method || "—",
+      getSearchableText: (row) => (row.payment_method as any) || "",
     },
   ];
 

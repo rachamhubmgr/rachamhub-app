@@ -157,6 +157,10 @@ export default function WarehouseOrdersPage() {
     }
   }, []);
 
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
     setEditForm({ ...order });
@@ -191,6 +195,7 @@ export default function WarehouseOrdersPage() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id || "").split("-")[0]}`,
+        getSearchableText: (row) => String(row.id || "").split("-")[0],
       },
       {
         key: "created_at",
@@ -200,23 +205,32 @@ export default function WarehouseOrdersPage() {
             dateStyle: "short",
             timeStyle: "short",
           }),
+        getSearchableText: (row) =>
+          new Date(row.created_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "customer_name",
         label: "Customer Name",
         render: (row) => (row.customer_name as any) || "—",
+        getSearchableText: (row) => (row.customer_name as any) || "",
       },
       {
         key: "delivery_address",
         label: "Delivery Address",
         longText: true,
         render: (row) => (row.delivery_address as any) || "—",
+        getSearchableText: (row) => (row.delivery_address as any) || "",
       },
       {
         key: "phone_numbers",
         label: "Phone",
         render: (row) =>
           ((row.phone_numbers as string[]) || []).join(", ") || "—",
+        getSearchableText: (row) =>
+          ((row.phone_numbers as string[]) || []).join(", "),
       },
       {
         key: "items",
@@ -226,6 +240,8 @@ export default function WarehouseOrdersPage() {
           ((row.items as any[]) || [])
             .map((item: any) => `${item.quantity}x ${item.name}`)
             .join(", ") || "—",
+        getSearchableText: (row) =>
+          ((row.items as any[]) || []).map((item: any) => item.name).join(", "),
       },
       {
         key: "qty",
@@ -235,23 +251,34 @@ export default function WarehouseOrdersPage() {
             (total: number, item: any) => total + (item.quantity || 0),
             0,
           ) || "—",
+        getSearchableText: (row) =>
+          String(
+            ((row.items as any[]) || []).reduce(
+              (total: number, item: any) => total + (item.quantity || 0),
+              0,
+            ),
+          ),
       },
       {
         key: "total_amount",
         label: "Amount (₦)",
         render: (row) =>
           `₦${Number((row.total_amount as any) || 0).toLocaleString()}`,
+        getSearchableText: (row) =>
+          String(Number((row.total_amount as any) || 0)),
       },
       {
         key: "merchant",
         label: "Merchant Name",
         render: (row) => (row.merchant as any) || "—",
+        getSearchableText: (row) => (row.merchant as any) || "",
       },
       {
         key: "cc_comment",
         label: "CC Comment",
         longText: true,
         render: (row) => (row.cc_comment as any) || "—",
+        getSearchableText: (row) => (row.cc_comment as any) || "",
       },
       {
         key: "warehouse_delivery_status",
@@ -268,6 +295,8 @@ export default function WarehouseOrdersPage() {
             {(row.warehouse_delivery_status as any) || "pending"}
           </span>
         ),
+        getSearchableText: (row) =>
+          (row.warehouse_delivery_status as any) || "pending",
       },
       {
         key: "inventory_status",
@@ -292,6 +321,7 @@ export default function WarehouseOrdersPage() {
           ) : (
             (row as any).inventory_status || "Unpacked"
           ),
+        getSearchableText: (row) => (row as any).inventory_status || "Unpacked",
       },
       {
         key: "fom_assigned",
@@ -320,6 +350,9 @@ export default function WarehouseOrdersPage() {
             fomUsers.find((u) => u.id === (row as any).fom_assigned)
               ?.display_name || "—"
           ),
+        getSearchableText: (row) =>
+          fomUsers.find((u) => u.id === (row as any).fom_assigned)
+            ?.display_name || "",
       },
       {
         key: "warehouse_comment",
@@ -343,6 +376,7 @@ export default function WarehouseOrdersPage() {
               {(row as any).warehouse_comment || "—"}
             </span>
           ),
+        getSearchableText: (row) => (row as any).warehouse_comment || "",
       },
       {
         key: "extracted_by",
@@ -350,14 +384,13 @@ export default function WarehouseOrdersPage() {
         render: (row) =>
           ccUsers.find((u) => u.id === (row.extracted_by as any))
             ?.display_name || "—",
+        getSearchableText: (row) =>
+          ccUsers.find((u) => u.id === (row.extracted_by as any))
+            ?.display_name || "",
       },
     ],
     [editingId, editForm, fomUsers, ccUsers, openCommentModal],
   );
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 

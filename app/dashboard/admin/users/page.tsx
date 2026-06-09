@@ -76,6 +76,8 @@ export default function UserManagementPage() {
           </div>
         </>
       ),
+      getSearchableText: (row) =>
+        `${(row as any).display_name} ${(row as any).email}`,
     },
     {
       key: "role",
@@ -85,6 +87,7 @@ export default function UserManagementPage() {
           {String((row as any).role).replace("_", " ")}
         </Badge>
       ),
+      getSearchableText: (row) => String((row as any).role).replace("_", " "),
     },
     {
       key: "status",
@@ -107,11 +110,22 @@ export default function UserManagementPage() {
               : "Inactive"}
         </Badge>
       ),
+      getSearchableText: (row) =>
+        row.is_deleted
+          ? "Deleted"
+          : row.is_active !== false
+            ? "Active"
+            : "Inactive",
     },
     {
       key: "created_at",
       label: "Created",
       render: (row) =>
+        new Date((row as any).created_at).toLocaleString([], {
+          dateStyle: "short",
+          timeStyle: "short",
+        }),
+      getSearchableText: (row) =>
         new Date((row as any).created_at).toLocaleString([], {
           dateStyle: "short",
           timeStyle: "short",

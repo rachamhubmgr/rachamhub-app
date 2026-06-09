@@ -201,11 +201,17 @@ export default function FOMDashboard() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id).split("-")[0]}`,
+        getSearchableText: (row) => String(row.id).split("-")[0],
       },
       {
         key: "fom_assigned_at",
         label: "Fom Assigned At",
         render: (row) =>
+          new Date(row.fom_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        getSearchableText: (row) =>
           new Date(row.fom_assigned_at as any).toLocaleString([], {
             dateStyle: "short",
             timeStyle: "short",
@@ -224,6 +230,8 @@ export default function FOMDashboard() {
             </div>
           </div>
         ),
+        getSearchableText: (row) =>
+          `${(row as any).customer_name || ""} ${(row as any).delivery_address || ""}`,
       },
       {
         key: "items",
@@ -235,6 +243,8 @@ export default function FOMDashboard() {
               .join(", ")}
           </div>
         ),
+        getSearchableText: (row) =>
+          ((row.items as any[]) || []).map((i) => i.name).join(", "),
       },
       {
         key: "amount",
@@ -260,6 +270,18 @@ export default function FOMDashboard() {
             </div>
           );
         },
+        getSearchableText: (row) => {
+          const inputs = rowInputs[String(row.id)] || {};
+          const selectedLandmark = landmarks.find(
+            (l) => l.name === inputs.landmark,
+          );
+          const landmarkPrice = selectedLandmark
+            ? Number(selectedLandmark.price)
+            : 0;
+          const paymentByMerchant =
+            Number((row.total_amount as any) || 0) - landmarkPrice;
+          return `${Number((row.total_amount as any) || 0)} ${paymentByMerchant}`;
+        },
       },
       {
         key: "rider_name",
@@ -280,6 +302,7 @@ export default function FOMDashboard() {
             ))}
           </select>
         ),
+        getSearchableText: (row) => rowInputs[String(row.id)]?.rider_name || "",
       },
       {
         key: "payment_to_rider",
@@ -295,6 +318,8 @@ export default function FOMDashboard() {
             }
           />
         ),
+        getSearchableText: (row) =>
+          String(rowInputs[String(row.id)]?.payment_to_rider || ""),
       },
       {
         key: "landmark",
@@ -315,6 +340,7 @@ export default function FOMDashboard() {
             ))}
           </select>
         ),
+        getSearchableText: (row) => rowInputs[String(row.id)]?.landmark || "",
       },
       {
         key: "payment_method",
@@ -335,6 +361,8 @@ export default function FOMDashboard() {
             ))}
           </select>
         ),
+        getSearchableText: (row) =>
+          rowInputs[String(row.id)]?.payment_method || "",
       },
       {
         key: "delivery_status",
@@ -355,6 +383,8 @@ export default function FOMDashboard() {
             ))}
           </select>
         ),
+        getSearchableText: (row) =>
+          rowInputs[String(row.id)]?.delivery_status || "",
       },
       {
         key: "fom_comment",
@@ -373,6 +403,8 @@ export default function FOMDashboard() {
             }
           />
         ),
+        getSearchableText: (row) =>
+          rowInputs[String(row.id)]?.fom_comment || "",
       },
     ],
     [rowInputs, riders, landmarks, openCommentModal, updateRowInput],

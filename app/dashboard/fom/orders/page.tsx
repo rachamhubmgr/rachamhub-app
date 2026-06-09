@@ -150,11 +150,21 @@ export default function FOMOrdersPage() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id).split("-")[0]}`,
+        getSearchableText: (row) => String(row.id).split("-")[0],
       },
       {
         key: "fom_assigned_at",
         label: "Fom Assigned At",
-        render: (row) => (row as any).fom_assigned_at,
+        render: (row) =>
+          new Date(row.fom_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        getSearchableText: (row) =>
+          new Date(row.fom_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "customer",
@@ -169,6 +179,8 @@ export default function FOMOrdersPage() {
             </div>
           </div>
         ),
+        getSearchableText: (row) =>
+          `${(row as any).customer_name || ""} ${(row as any).delivery_address || ""}`,
       },
       {
         key: "items",
@@ -180,6 +192,8 @@ export default function FOMOrdersPage() {
               .join(", ") || "—"}
           </div>
         ),
+        getSearchableText: (row) =>
+          ((row.items as any[]) || []).map((i) => i.name).join(", "),
       },
       {
         key: "rider_info",
@@ -192,17 +206,30 @@ export default function FOMOrdersPage() {
             </div>
           </div>
         ),
+        getSearchableText: (row) =>
+          `${(row as any).rider_name || ""} ${(row as any).landmark || ""}`,
       },
       {
         key: "rider_assigned_at",
         label: "Rider Assigned At",
-        render: (row) => (row as any).rider_assigned_at,
+        render: (row) =>
+          new Date(row.rider_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        getSearchableText: (row) =>
+          new Date(row.rider_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
       },
       {
         key: "payment_to_rider",
         label: "Rider Price (₦)",
         render: (row) =>
           `₦${Number((row as any).payment_to_rider || 0).toLocaleString()}`,
+        getSearchableText: (row) =>
+          String(Number((row as any).payment_to_rider || 0)),
       },
       {
         key: "payment_method",
@@ -235,6 +262,7 @@ export default function FOMOrdersPage() {
           }
           return (row as any).payment_method || "—";
         },
+        getSearchableText: (row) => (row as any).payment_method || "",
       },
       {
         key: "bank",
@@ -263,6 +291,7 @@ export default function FOMOrdersPage() {
           }
           return (row as any).bank || "—";
         },
+        getSearchableText: (row) => (row as any).bank || "",
       },
       {
         key: "fom_delivery_status",
@@ -301,6 +330,8 @@ export default function FOMOrdersPage() {
             </span>
           );
         },
+        getSearchableText: (row) =>
+          (row as any).fom_delivery_status || "pending",
       },
       {
         key: "fom_comment",
@@ -324,6 +355,7 @@ export default function FOMOrdersPage() {
           }
           return (row as any).fom_comment || "—";
         },
+        getSearchableText: (row) => (row as any).fom_comment || "",
       },
     ],
     [editingId, editForm],

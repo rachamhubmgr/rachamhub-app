@@ -21,7 +21,7 @@ export default function InvoicesPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifications, setVerifications] = useState<
-    Record<string, { confirmed: string }>
+    Record<string, { confirmed: string; bank: string }>
   >({});
 
   const fetchData = useCallback(async () => {
@@ -126,11 +126,17 @@ export default function InvoicesPage() {
         key: "id",
         label: "Order ID",
         render: (row) => `#${String(row.id).split("-")[0]}`,
+        getSearchableText: (row) => String(row.id).split("-")[0],
       },
       {
         key: "rider_assigned_at",
         label: "Rider Assigned At",
         render: (row) =>
+          new Date(row.rider_assigned_at as any).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        getSearchableText: (row) =>
           new Date(row.rider_assigned_at as any).toLocaleString([], {
             dateStyle: "short",
             timeStyle: "short",
@@ -141,13 +147,16 @@ export default function InvoicesPage() {
         label: "Customer Name",
         longText: true,
         render: (row) => (row.customer_name as any) || "—",
+        getSearchableText: (row) => (row.customer_name as any) || "",
       },
       {
         key: "product_name",
         label: "Product Name",
         longText: true,
         render: (row) =>
-          ((row.items as any[]) || []).map((i: any) => i.name).join(", "),
+          ((row.items as any[]) || []).map((i: any) => i.name).join(", "), // Display
+        getSearchableText: (row) =>
+          ((row.items as any[]) || []).map((i: any) => i.name).join(", "), // Searchable text
       },
       {
         key: "qty",
@@ -157,23 +166,35 @@ export default function InvoicesPage() {
             (acc: number, i: any) => acc + i.quantity,
             0,
           ),
+        getSearchableText: (row) =>
+          String(
+            ((row.items as any[]) || []).reduce(
+              (acc: number, i: any) => acc + i.quantity,
+              0,
+            ),
+          ),
       },
       {
         key: "fom_assigned",
         label: "FOM Assigned",
         render: (row) =>
           foms.find((user) => user.id === (row as any).fom_assigned)
-            ?.display_name || "—",
+            ?.display_name || "—", // Display
+        getSearchableText: (row) =>
+          foms.find((user) => user.id === (row as any).fom_assigned)
+            ?.display_name || "", // Searchable text
       },
       {
         key: "total_amount",
         label: "Order Amount",
         render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
+        getSearchableText: (row) => String(Number(row.total_amount || 0)),
       },
       {
         key: "landmark",
         label: "Landmark",
         render: (row) => (row.landmark as any) || "—",
+        getSearchableText: (row) => (row.landmark as any) || "",
       },
       {
         key: "landmark_price",
@@ -184,28 +205,37 @@ export default function InvoicesPage() {
               .find((l) => l.name === (row as any).landmark)
               ?.price?.toLocaleString() || "—"
           }`,
+        getSearchableText: (row) =>
+          String(
+            landmarks.find((l) => l.name === (row as any).landmark)?.price ||
+              "",
+          ),
       },
       {
         key: "rider_name",
         label: "Rider",
         longText: true,
         render: (row) => (row.rider_name as any) || "—",
+        getSearchableText: (row) => (row.rider_name as any) || "",
       },
       {
         key: "payment_to_rider",
         label: "Rider Fee",
         render: (row) =>
           `₦${Number(row.payment_to_rider || 0).toLocaleString()}`,
+        getSearchableText: (row) => String(Number(row.payment_to_rider || 0)),
       },
       {
         key: "payment_method",
         label: "Payment Method",
         render: (row) => (row as any).payment_method || "—",
+        getSearchableText: (row) => (row.payment_method as any) || "",
       },
       {
         key: "bank",
         label: "Bank",
         render: (row) => (row as any).bank || "—",
+        getSearchableText: (row) => (row.bank as any) || "",
       },
       {
         key: "payment_verification",
@@ -234,6 +264,8 @@ export default function InvoicesPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${verifications[String(row.id)]?.confirmed === "true" ? "Confirmed" : "Not Confirmed"} ${verifications[String(row.id)]?.bank || ""}`,
       },
       {
         key: "action",
