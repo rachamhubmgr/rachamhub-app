@@ -57,7 +57,7 @@ export default function FOMOrdersPage() {
             .from("orders")
             .select("*")
             .eq("fom_assigned", user.uid)
-            .eq("status", "fom")
+            .or("status.eq.fom, status.eq.accounting")
             .order("created_at", { ascending: false }),
           supabase!
             .from("merchants")
