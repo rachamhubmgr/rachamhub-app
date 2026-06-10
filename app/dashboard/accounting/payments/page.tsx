@@ -5,13 +5,16 @@ import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Order } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import OrderSearchFilter from "@/components/order-search-filter";
+import { Button } from "@/components/ui/button";
+import { handleExport } from "@/lib/utils";
 
 export default function PaymentsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [foms, setFoms] = useState<any[]>([]);
+  const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [landmarks, setLandmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,6 +30,7 @@ export default function PaymentsPage() {
         { data: ordersData, error: fetchError },
         { data: landmarksData },
         { data: fomUserData },
+        { data: ccUserData },
       ] = await Promise.all([
         supabase!
           .from("orders")
@@ -35,6 +39,10 @@ export default function PaymentsPage() {
           .order("updated_at", { ascending: false }),
         supabase!.from("landmarks").select("*").eq("is_active", true),
         supabase!.from("users").select("id, display_name").eq("role", "fom"),
+        supabase!
+          .from("users")
+          .select("id, display_name")
+          .eq("role", "customer_service"),
       ]);
 
       if (fetchError) {
@@ -44,6 +52,7 @@ export default function PaymentsPage() {
       setOrders((ordersData ?? []) as Order[]);
       setLandmarks((landmarksData ?? []) as any[]);
       setFoms((fomUserData ?? []) as any[]);
+      setCcUsers((ccUserData ?? []) as any[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load payments.");
     } finally {
@@ -163,11 +172,28 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Payments</h1>
-        <p className="text-muted-foreground mt-2">
-          Review confirmed payments and completed orders.
-        </p>
+      <div className="flex flex-row items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Payments</h1>
+          <p className="text-muted-foreground mt-2">
+            Review confirmed payments and completed orders.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => handleExport(orders, foms, ccUsers, "csv")}
+            disabled={loading || orders.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleExport(orders, foms, ccUsers, "xlsx")}
+            disabled={loading || orders.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
+          </Button>
+        </div>
       </div>
 
       {loading ? (

@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
-import { Check, Edit2, Loader2, X } from "lucide-react";
+import { Check, Download, Edit2, Loader2, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, handleExport } from "@/lib/utils";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
@@ -33,6 +33,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fomUsers, setFomUsers] = useState<any[]>([]);
+  const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Order | null>(null);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
@@ -210,6 +211,7 @@ export default function InventoryPage() {
         { data: ordersData, error: fetchError },
         { data: merchantsData },
         { data: fomUserData },
+        { data: ccUserData },
       ] = await Promise.all([
         supabase!
           .from("orders")
@@ -221,6 +223,10 @@ export default function InventoryPage() {
           .eq("is_active", true)
           .order("name"),
         supabase!.from("users").select("id, display_name").eq("role", "fom"),
+        supabase!
+          .from("users")
+          .select("id, display_name")
+          .eq("role", "customer_service"),
       ]);
 
       if (fetchError) throw fetchError;
@@ -228,6 +234,7 @@ export default function InventoryPage() {
       if (merchantsData)
         setMerchantOptions(merchantsData.map((m: any) => m.name));
       if (fomUserData) setFomUsers(fomUserData);
+      if (ccUserData) setCcUsers(ccUserData);
       setOrders((ordersData ?? []) as Order[]);
     } catch (err) {
       setError(
@@ -284,6 +291,7 @@ export default function InventoryPage() {
   }, [editForm]);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
@@ -360,13 +368,30 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Inventory Management
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Track stock levels and manage items across orders.
-        </p>
+      <div className="flex flex-row items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            Inventory Management
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Track stock levels and manage items across orders.
+          </p>{" "}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => handleExport(orders, fomUsers, ccUsers, "csv")}
+              disabled={loading || orders.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleExport(orders, fomUsers, ccUsers, "xlsx")}
+              disabled={loading || orders.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card className="p-6">

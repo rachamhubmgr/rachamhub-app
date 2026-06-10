@@ -15,10 +15,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Package, Search, Edit2, Check, X } from "lucide-react";
+import {
+  Loader2,
+  Package,
+  Search,
+  Edit2,
+  Check,
+  X,
+  Download,
+} from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, handleExport } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -47,6 +55,7 @@ export default function OrdersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [ccUsers, setCcUsers] = useState<any[]>([]);
+  const [fomUsers, setFomUsers] = useState<any[]>([]);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
@@ -75,18 +84,22 @@ export default function OrdersPage() {
         .eq("role", "customer_service");
       if (ccUserData) setCcUsers(ccUserData);
 
-      const [{ data: merchantData }, { data, error: fetchError }] =
-        await Promise.all([
-          supabase!
-            .from("merchants")
-            .select("name")
-            .eq("is_active", true)
-            .order("name"),
-          supabase!
-            .from("orders")
-            .select("*")
-            .order("created_at", { ascending: false }),
-        ]);
+      const [
+        { data: merchantData },
+        { data, error: fetchError },
+        { data: fomUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("merchants")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+      ]);
 
       if (merchantData) {
         setMerchantOptions(
@@ -99,6 +112,7 @@ export default function OrdersPage() {
       }
 
       setOrders((data ?? []) as Order[]);
+      if (fomUserData) setFomUsers(fomUserData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load orders.");
     } finally {
@@ -476,11 +490,28 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Orders</h1>
-        <p className="text-muted-foreground mt-2">
-          Review customer orders and track their workflow across the system.
-        </p>
+      <div className="flex flex-row items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Orders</h1>
+          <p className="text-muted-foreground mt-2">
+            Review customer orders and track their workflow across the system.
+          </p>{" "}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => handleExport(orders, fomUsers, ccUsers, "csv")}
+              disabled={loading || orders.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleExport(orders, fomUsers, ccUsers, "xlsx")}
+              disabled={loading || orders.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
+            </Button>
+          </div>
+        </div>
       </div>
 
       {loading ? (

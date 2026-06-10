@@ -15,87 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import OrderSearchFilter from "@/components/order-search-filter";
 import { Loader2, Download, Trash2, Edit2, Check, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { buildCsv, cn, formatDateDisplay, handleExport } from "@/lib/utils";
 
 const formatCurrency = (value: number) =>
   `₦${Number(value || 0).toLocaleString()}`;
-
-const buildCsv = (
-  orders: Order[],
-  fomUsers: any[] = [],
-  ccUsers: any[] = [],
-) => {
-  const headers = [
-    "Order ID",
-    "Created At",
-    "Customer Name",
-    "Merchant",
-    "Items",
-    "Total Amount",
-    "WH Status",
-    "FOM Status",
-    "Inventory",
-    "FOM Assigned",
-    "Rider Name",
-    "Rider Price",
-    "Landmark",
-    "Payment Method",
-    "Payment Confirmed",
-    "To Merchant",
-    "Bank",
-    "Delivery Address",
-    "Phone Numbers",
-    "CC Note",
-    "WH Note",
-    "FOM Note",
-    "Entered By",
-  ];
-
-  const rows = orders.map((order) => {
-    const fomUser = fomUsers.find((u) => u.id === (order as any).fom_assigned);
-    const ccUser = ccUsers.find((u) => u.id === order.extracted_by);
-    const riderPrice = Number((order as any).payment_to_rider || 0);
-    const total = Number(order.total_amount || 0);
-
-    return [
-      `${order.id.split("-")[0]}`,
-      new Date(order.created_at).toLocaleString(),
-      order.customer_name || "",
-      order.merchant || "",
-      order.items?.map((i) => `${i.quantity}x ${i.name}`).join("; ") || "",
-      total.toFixed(2),
-      order.warehouse_delivery_status || "",
-      order.fom_delivery_status || "",
-      (order as any).inventory_status || "",
-      fomUser?.display_name || "",
-      (order as any).rider_name || "",
-      riderPrice.toFixed(2),
-      (order as any).landmark || "",
-      (order as any).payment_method || "",
-      (order as any).payment_confirmed ? "Yes" : "No",
-      (total - riderPrice).toFixed(2),
-      (order as any).bank || "",
-      order.delivery_address || "",
-      Array.isArray(order.phone_numbers) ? order.phone_numbers.join(", ") : "",
-      (order as any).cc_comment || "",
-      (order as any).warehouse_comment || "",
-      (order as any).fom_comment || "",
-      ccUser?.display_name || "",
-    ];
-  });
-
-  const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
-
-  return [headers, ...rows]
-    .map((row) => row.map((value) => escapeValue(String(value))).join(","))
-    .join("\n");
-};
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -309,19 +237,6 @@ export default function AdminOrdersPage() {
     } finally {
       setActionLoading(null);
     }
-  };
-
-  const handleExport = () => {
-    const csv = buildCsv(orders, fomUsers, ccUsers);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `rachamhub-orders-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   const columns = useMemo<DataTableColumn[]>(
@@ -990,14 +905,14 @@ export default function AdminOrdersPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={handleExport}
+            onClick={() => handleExport(orders, fomUsers, ccUsers, "csv")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
           <Button
             variant="outline"
-            onClick={handleExport}
+            onClick={() => handleExport(orders, fomUsers, ccUsers, "xlsx")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export Spreadsheet

@@ -8,9 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Order } from "@/lib/types";
-import { Check, Loader2, X, Edit2 } from "lucide-react";
+import { Check, Loader2, X, Edit2, Download } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
-import { cn } from "@/lib/utils";
+import { cn, handleExport } from "@/lib/utils";
 import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -36,6 +36,8 @@ const BANK_OPTIONS = ["UBA", "moniepoint"];
 
 export default function FOMOrdersPage() {
   const { user } = useAuth();
+  const [foms, setFoms] = useState<any[]>([]);
+  const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,20 +53,29 @@ export default function FOMOrdersPage() {
     setError(null);
 
     try {
-      const [{ data: ordersData, error: fetchError }, { data: merchantsData }] =
-        await Promise.all([
-          supabase!
-            .from("orders")
-            .select("*")
-            .eq("fom_assigned", user.uid)
-            .or("status.eq.fom, status.eq.accounting")
-            .order("created_at", { ascending: false }),
-          supabase!
-            .from("merchants")
-            .select("name")
-            .eq("is_active", true)
-            .order("name"),
-        ]);
+      const [
+        { data: ordersData, error: fetchError },
+        { data: merchantsData },
+        { data: fomUserData },
+        { data: ccUserData },
+      ] = await Promise.all([
+        supabase!
+          .from("orders")
+          .select("*")
+          .eq("fom_assigned", user.uid)
+          .or("status.eq.fom, status.eq.accounting")
+          .order("created_at", { ascending: false }),
+        supabase!
+          .from("merchants")
+          .select("name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase!.from("users").select("id, display_name").eq("role", "fom"),
+        supabase!
+          .from("users")
+          .select("id, display_name")
+          .eq("role", "customer_service"),
+      ]);
 
       if (fetchError) throw fetchError;
 
@@ -72,6 +83,8 @@ export default function FOMOrdersPage() {
         setMerchantOptions(merchantsData.map((m: any) => m.name));
       }
       setOrders((ordersData ?? []) as Order[]);
+      setFoms((fomUserData ?? []) as any[]);
+      setCcUsers((ccUserData ?? []) as any[]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load FOM orders.",
@@ -409,11 +422,28 @@ export default function FOMOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">My Orders</h1>
-        <p className="text-muted-foreground mt-2">
-          History of fulfillment orders processed and completed.
-        </p>
+      <div className="flex flex-row items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">My Orders</h1>
+          <p className="text-muted-foreground mt-2">
+            History of fulfillment orders processed and completed.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => handleExport(orders, foms, ccUsers, "csv")}
+            disabled={loading || orders.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleExport(orders, foms, ccUsers, "xlsx")}
+            disabled={loading || orders.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">

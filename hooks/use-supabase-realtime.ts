@@ -48,31 +48,14 @@ export function useSupabaseRealtime(
             filter: subConfig.filter,
           } as any,
           (payload: RealtimePostgresChangesPayload<any>) => {
-            console.log(
-              `[Supabase Realtime] Event received for ${subConfig.table}:`,
-              payload,
-            );
             callbackRef.current(); // Use the ref to call the latest callback
           },
         )
         .subscribe((status, err) => {
           if (status === "SUBSCRIBED") {
-            console.log(
-              `[Supabase Realtime] Subscribed to ${subConfig.table} (event: ${subConfig.event})`,
-            );
           } else if (status === "CHANNEL_ERROR") {
-            console.error(
-              `[Supabase Realtime] Error subscribing to ${subConfig.table}:`,
-              err,
-            );
           } else if (status === "TIMED_OUT") {
-            console.warn(
-              `[Supabase Realtime] Subscription timed out for ${subConfig.table}.`,
-            );
           } else if (status === "CLOSED") {
-            console.warn(
-              `[Supabase Realtime] Realtime channel closed for ${subConfig.table}.`,
-            );
           }
         });
       channels.push(channel);
@@ -80,9 +63,6 @@ export function useSupabaseRealtime(
 
     return () => {
       channels.forEach((channel) => {
-        console.log(
-          `[Supabase Realtime] Unsubscribing from channel: ${channel.topic}`,
-        );
         supabase!.removeChannel(channel);
       });
     };
