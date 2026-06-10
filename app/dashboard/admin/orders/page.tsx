@@ -342,6 +342,13 @@ export default function AdminOrdersPage() {
             </div>
           </div>
         ),
+        getSearchableText: (row) =>
+          `${String((row as any).id).split("-")[0]} ${new Date(
+            (row as any).created_at as any,
+          ).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          })}`,
       },
       {
         key: "customer_name",
@@ -397,6 +404,8 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${(row as any).customer_name as any} ${(row as any).delivery_address} ${(((row as any).phone_numbers as string[]) || []).join(", ")}`,
       },
       {
         key: "merchant",
@@ -438,6 +447,12 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${(row as any).merchant as any} ${(
+            ((row as any).items as any[]) || []
+          )
+            .map((i) => `${i.quantity}x ${i.name}`)
+            .join(", ")}`,
       },
       {
         key: "financials",
@@ -482,6 +497,14 @@ export default function AdminOrdersPage() {
               </div>
             </div>
           );
+        },
+        getSearchableText: (row) => {
+          const total = Number(row.total_amount);
+          const riderFee = Number((row as any).payment_to_rider);
+
+          const toMerchant = total - riderFee;
+
+          return `${formatCurrency(total)} ${formatCurrency(riderFee)} ${formatCurrency(toMerchant)}`;
         },
       },
       {
@@ -574,6 +597,8 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${String(row.warehouse_delivery_status)} ${String(row.fom_delivery_status)}`,
       },
       {
         key: "dispatch",
@@ -632,14 +657,22 @@ export default function AdminOrdersPage() {
               {(row as any).rider_assigned_at && (
                 <div className="text-[8px] text-muted-foreground leading-none">
                   Set:{" "}
-                  {new Date(
-                    (row as any).rider_assigned_at,
-                  ).toLocaleDateString()}
+                  {new Date((row as any).rider_assigned_at).toLocaleString([], {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
                 </div>
               )}
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${
+            fomUsers.find((u) => u.id === (row as any).fom_assigned)
+              ?.display_name
+          } ${(row as any).rider_name} ${new Date(
+            (row as any).rider_assigned_at,
+          ).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`,
       },
       {
         key: "payment_info",
@@ -703,9 +736,10 @@ export default function AdminOrdersPage() {
               {(row as any).payment_verified_at && (
                 <div className="text-[8px] text-muted-foreground italic">
                   Verified:{" "}
-                  {new Date(
-                    (row as any).payment_verified_at,
-                  ).toLocaleDateString()}
+                  {new Date((row as any).payment_verified_at).toLocaleString(
+                    [],
+                    { dateStyle: "short", timeStyle: "short" },
+                  )}
                 </div>
               )}
               <div className="flex justify-between items-center gap-1">
@@ -734,6 +768,13 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${(row as any).payment_method} ${row.payment_confirmed ? "Yes" : "No"} ${new Date(
+            (row as any).payment_verified_at,
+          ).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          })} ${(row as any).bank}`,
       },
       {
         key: "cc_comment",
@@ -759,6 +800,7 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) => `${(row as any).cc_comment as string}`,
       },
       {
         key: "warehouse_comment",
@@ -784,6 +826,8 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) =>
+          `${(row as any).warehouse_comment as string}`,
       },
       {
         key: "fom_comment",
@@ -809,6 +853,7 @@ export default function AdminOrdersPage() {
             </div>
           );
         },
+        getSearchableText: (row) => `${(row as any).fom_comment as string}`,
       },
       {
         key: "extracted_by",
@@ -819,6 +864,11 @@ export default function AdminOrdersPage() {
               ?.display_name || "—"}
           </div>
         ),
+        getSearchableText: (row) =>
+          `${
+            ccUsers.find((u) => u.id === (row.extracted_by as any))
+              ?.display_name
+          }`,
       },
     ],
     [

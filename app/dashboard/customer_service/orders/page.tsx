@@ -192,6 +192,7 @@ export default function OrdersPage() {
             (row.customer_name as any) || "—"
           );
         },
+        getSearchableText: (row) => `${row.customer_name as any}`,
       },
       {
         key: "delivery_address",
@@ -212,6 +213,7 @@ export default function OrdersPage() {
             (row.delivery_address as any) || "—"
           );
         },
+        getSearchableText: (row) => `${row.delivery_address as any}`,
       },
       {
         key: "phone_numbers",
@@ -230,6 +232,8 @@ export default function OrdersPage() {
             ((row.phone_numbers as string[]) || []).join(", ") || "—"
           );
         },
+        getSearchableText: (row) =>
+          `${((row.phone_numbers as string[]) || []).join(", ")}`,
       },
       {
         key: "item_name",
@@ -256,6 +260,10 @@ export default function OrdersPage() {
               .join(", ") || "—"
           );
         },
+        getSearchableText: (row) =>
+          `${((row.items as any[]) || [])
+            .map((item: any) => item.name)
+            .join(", ")}`,
       },
       {
         key: "item_quantity",
@@ -292,6 +300,11 @@ export default function OrdersPage() {
             ) || "—"
           );
         },
+        getSearchableText: (row) =>
+          `${((row.items as any[]) || []).reduce(
+            (total: number, item: any) => total + item.quantity,
+            0,
+          )}`,
       },
       {
         key: "total_amount",
@@ -318,6 +331,8 @@ export default function OrdersPage() {
             `₦${Number((row.total_amount as any) || 0).toLocaleString()}`
           );
         },
+        getSearchableText: (row) =>
+          `₦${Number((row.total_amount as any) || 0).toLocaleString()}`,
       },
       {
         key: "merchant",
@@ -335,6 +350,7 @@ export default function OrdersPage() {
             (row.merchant as any) || "—"
           );
         },
+        getSearchableText: (row) => `${row.merchant as any}`,
       },
       {
         key: "cc_comment",
@@ -355,6 +371,7 @@ export default function OrdersPage() {
             (row.cc_comment as any) || "—"
           );
         },
+        getSearchableText: (row) => `${row.cc_comment as any}`,
       },
       {
         key: "fom_delivery_status",
