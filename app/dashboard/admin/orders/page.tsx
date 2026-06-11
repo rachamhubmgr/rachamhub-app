@@ -905,14 +905,14 @@ export default function AdminOrdersPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => handleExport(orders, fomUsers, ccUsers, "csv")}
+            onClick={() => handleExport(fomUsers, ccUsers, "csv")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
           <Button
             variant="outline"
-            onClick={() => handleExport(orders, fomUsers, ccUsers, "xlsx")}
+            onClick={() => handleExport(fomUsers, ccUsers, "xlsx")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export Spreadsheet

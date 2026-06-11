@@ -191,6 +191,22 @@ export default function InvoicesPage() {
         getSearchableText: (row) => String(Number(row.total_amount || 0)),
       },
       {
+        key: "merchant",
+        label: "Merchant",
+        longText: true,
+        render: (row) => (row.merchant as any) || "—",
+        getSearchableText: (row) => (row.merchant as any) || "",
+      },
+      {
+        key: "payment_to_merchant",
+        label: "Payment To Merchant",
+        longText: true,
+        render: (row) =>
+          `₦${Number(row.payment_to_merchant || 0).toLocaleString()}`,
+        getSearchableText: (row) =>
+          String(Number(row.payment_to_merchant || 0)),
+      },
+      {
         key: "landmark",
         label: "Landmark",
         render: (row) => (row.landmark as any) || "—",

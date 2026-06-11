@@ -431,14 +431,14 @@ export default function FOMOrdersPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => handleExport(orders, foms, ccUsers, "csv")}
+            onClick={() => handleExport(foms, ccUsers, "csv")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
           <Button
             variant="outline"
-            onClick={() => handleExport(orders, foms, ccUsers, "xlsx")}
+            onClick={() => handleExport(foms, ccUsers, "xlsx")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export Spreadsheet

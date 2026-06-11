@@ -109,6 +109,21 @@ export default function PaymentsPage() {
       getSearchableText: (row) => String(Number(row.total_amount || 0)),
     },
     {
+      key: "merchant",
+      label: "Merchant",
+      longText: true,
+      render: (row) => (row.merchant as any) || "—",
+      getSearchableText: (row) => (row.merchant as any) || "",
+    },
+    {
+      key: "payment_to_merchant",
+      label: "Payment To Merchant",
+      longText: true,
+      render: (row) =>
+        `₦${Number(row.payment_to_merchant || 0).toLocaleString()}`,
+      getSearchableText: (row) => String(Number(row.payment_to_merchant || 0)),
+    },
+    {
       key: "landmark",
       label: "Landmark",
       render: (row) => (row.landmark as any) || "—",
@@ -181,14 +196,14 @@ export default function PaymentsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => handleExport(orders, foms, ccUsers, "csv")}
+            onClick={() => handleExport(foms, ccUsers, "csv")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
           <Button
             variant="outline"
-            onClick={() => handleExport(orders, foms, ccUsers, "xlsx")}
+            onClick={() => handleExport(foms, ccUsers, "xlsx")}
             disabled={loading || orders.length === 0}
           >
             <Download className="mr-2 h-4 w-4" /> Export Spreadsheet

@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Order } from "@/lib/types";
 import * as XLSX from "xlsx";
+import supabase from "./supabase";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -14,6 +15,15 @@ export function formatDateDisplay(input: Date) {
   });
 }
 
+const getOrders = async () => {
+  const { data, error: fetchError } = await supabase!
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  return { data, fetchError };
+};
+
 export const prepareExportData = (
   orders: Order[],
   fomUsers: any[] = [],
@@ -24,9 +34,10 @@ export const prepareExportData = (
     "Created At",
     "Customer Name",
     "Phone Numbers",
-    "Merchant",
     "Items",
     "Total Amount",
+    "Merchant",
+    "Payment To Merchant",
     "Delivery Address",
     "WH Status",
     "FOM Status",
@@ -59,9 +70,10 @@ export const prepareExportData = (
       formatDateDisplay(new Date(order.created_at)),
       order.customer_name || "",
       Array.isArray(order.phone_numbers) ? order.phone_numbers.join(", ") : "",
-      order.merchant || "",
       order.items?.map((i) => `${i.quantity}x ${i.name}`).join("; ") || "",
       total.toFixed(2),
+      order.merchant || "",
+      order.payment_to_merchant || "",
       order.delivery_address || "",
       order.warehouse_delivery_status || "",
       order.fom_delivery_status || "",
@@ -100,14 +112,14 @@ export const buildCsv = (
     .join("\n");
 };
 
-export const handleExport = (
-  orders: Order[],
+export const handleExport = async (
   fomUsers: any[] = [],
   ccUsers: any[] = [],
   type: "csv" | "xlsx" = "csv",
 ) => {
+  const { data: orders } = await getOrders();
   if (type === "xlsx") {
-    const { headers, rows } = prepareExportData(orders, fomUsers, ccUsers);
+    const { headers, rows } = prepareExportData(orders!, fomUsers, ccUsers);
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
@@ -118,7 +130,7 @@ export const handleExport = (
     return;
   }
 
-  const csv = buildCsv(orders, fomUsers, ccUsers);
+  const csv = buildCsv(orders!, fomUsers, ccUsers);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
