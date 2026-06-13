@@ -38,7 +38,7 @@ export default function AdminOrdersPage() {
   const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [riderOptions, setRiderOptions] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [editedFields, setEditedFields] = useState<Set<string>>(new Set());
 
@@ -58,6 +58,7 @@ export default function AdminOrdersPage() {
       { data: riderData },
       { data: fomUserData },
       { data: ccUserData },
+      { data: landmarkData },
     ] = await Promise.all([
       supabase!
         .from("merchants")
@@ -74,10 +75,12 @@ export default function AdminOrdersPage() {
         .from("users")
         .select("id, display_name")
         .eq("role", "customer_service"),
+      supabase!.from("landmarks").select("*"),
     ]);
 
     if (fomUserData) setFomUsers(fomUserData);
     if (ccUserData) setCcUsers(ccUserData);
+    if (landmarkData) setLandmarks(landmarkData);
 
     if (merchantData) {
       setMerchantOptions(
@@ -868,7 +871,7 @@ export default function AdminOrdersPage() {
         order.fom_delivery_status === "cancelled",
     ).length;
     const revenue = orders.reduce(
-      (sum, order) => sum + Number(order.total_amount || 0),
+      (sum, order) => sum + Number(order.amount_paid || 0),
       0,
     );
     const owed = orders.reduce(
@@ -878,8 +881,7 @@ export default function AdminOrdersPage() {
     const fees = orders.reduce(
       (sum, order) =>
         sum +
-        Number(order.total_amount || 0) -
-        Number(order.payment_to_merchant || 0),
+        Number(landmarks!.find((l) => l.name === order.landmark)?.price || 0),
       0,
     );
     return {
@@ -953,7 +955,7 @@ export default function AdminOrdersPage() {
         </div>
         <div className="rounded-2xl border border-border p-4">
           <p className="text-sm text-muted-foreground">
-            Amount owed to merchants
+            Amount Paid to merchants
           </p>
           <p className="mt-2 text-3xl font-semibold text-foreground">
             {formatCurrency(summary.owed)}

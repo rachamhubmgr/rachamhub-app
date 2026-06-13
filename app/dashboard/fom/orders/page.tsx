@@ -12,6 +12,7 @@ import { Check, Loader2, X, Edit2, Download } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { cn, handleExport } from "@/lib/utils";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -124,6 +125,8 @@ export default function FOMOrdersPage() {
           payment_method: editForm.payment_method?.toLowerCase(),
           bank: editForm.bank,
           fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
+          quantity_delivered: editForm.quantity_delivered,
+          amount_paid: editForm.amount_paid,
           fom_comment: editForm.fom_comment,
           updated_at: new Date().toISOString(),
         })
@@ -245,6 +248,46 @@ export default function FOMOrdersPage() {
           String(Number((row as any).payment_to_rider || 0)),
       },
       {
+        key: "fom_delivery_status",
+        label: "Del. Status",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing && editForm?.fom_delivery_status !== "delivered") {
+            return (
+              <select
+                value={editForm?.fom_delivery_status ?? "pending"}
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev
+                      ? { ...prev, fom_delivery_status: e.target.value }
+                      : prev,
+                  )
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+              >
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            );
+          }
+          return (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
+                STATUS_STYLES[(row as any).fom_delivery_status || "pending"],
+              )}
+            >
+              {(row as any).fom_delivery_status || "pending"}
+            </span>
+          );
+        },
+        getSearchableText: (row) =>
+          (row as any).fom_delivery_status || "pending",
+      },
+      {
         key: "payment_method",
         label: "Payment Method",
         render: (row) => {
@@ -307,44 +350,56 @@ export default function FOMOrdersPage() {
         getSearchableText: (row) => (row as any).bank || "",
       },
       {
-        key: "fom_delivery_status",
-        label: "Del. Status",
+        key: "quantity_delivered",
+        label: "Quantity Delivered",
         render: (row) => {
           const isEditing = editingId === String(row.id);
-          if (isEditing && editForm?.fom_delivery_status !== "delivered") {
+          if (isEditing) {
             return (
-              <select
-                value={editForm?.fom_delivery_status ?? "pending"}
+              <Input
+                className="h-7 w-full text-[10px]"
+                type="number"
+                placeholder="0"
+                value={editForm?.quantity_delivered ?? ""}
                 onChange={(e) =>
                   setEditForm((prev) =>
                     prev
-                      ? { ...prev, fom_delivery_status: e.target.value }
+                      ? { ...prev, quantity_delivered: Number(e.target.value) }
                       : prev,
                   )
                 }
-                className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
-              >
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              />
             );
           }
-          return (
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                STATUS_STYLES[(row as any).fom_delivery_status || "pending"],
-              )}
-            >
-              {(row as any).fom_delivery_status || "pending"}
-            </span>
-          );
+          return (row as any).quantity_delivered || "—";
         },
-        getSearchableText: (row) =>
-          (row as any).fom_delivery_status || "pending",
+        getSearchableText: (row) => (row as any).quantity_delivered || "",
+      },
+      {
+        key: "amount_paid",
+        label: "Amount Paid",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          if (isEditing) {
+            return (
+              <Input
+                className="h-7 w-full text-[10px]"
+                type="number"
+                placeholder="0"
+                value={editForm?.amount_paid ?? ""}
+                onChange={(e) =>
+                  setEditForm((prev) =>
+                    prev
+                      ? { ...prev, amount_paid: Number(e.target.value) }
+                      : prev,
+                  )
+                }
+              />
+            );
+          }
+          return (row as any).amount_paid || "—";
+        },
+        getSearchableText: (row) => (row as any).amount_paid || "",
       },
       {
         key: "fom_comment",

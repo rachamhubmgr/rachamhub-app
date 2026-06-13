@@ -72,6 +72,8 @@ export interface Order {
   payment_verified_at: string;
   fom_assigned_at: string;
   rider_assigned_at: string;
+  quantity_delivered: number | null;
+  amount_paid: number | null;
 }
 
 export interface OrderItem {

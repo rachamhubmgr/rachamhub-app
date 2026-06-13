@@ -103,10 +103,22 @@ export default function PaymentsPage() {
           ?.display_name || "",
     },
     {
+      key: "amount_paid",
+      label: "Amount Paid",
+      render: (row) => `₦${Number(row.amount_paid || 0).toLocaleString()}`,
+      getSearchableText: (row) => String(Number(row.amount_paid || 0)),
+    },
+    {
       key: "total_amount",
       label: "Order Amount",
       render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
       getSearchableText: (row) => String(Number(row.total_amount || 0)),
+    },
+    {
+      key: "quantity_delivered",
+      label: "Quantity Delivered",
+      render: (row) => Number(row.quantity_delivered || 0).toLocaleString(),
+      getSearchableText: (row) => String(Number(row.quantity_delivered || 0)),
     },
     {
       key: "merchant",

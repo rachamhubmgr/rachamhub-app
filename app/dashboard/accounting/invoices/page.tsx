@@ -46,7 +46,7 @@ export default function InvoicesPage() {
           .select("name")
           .eq("is_active", true)
           .order("name"),
-        supabase!.from("landmarks").select("*").eq("is_active", true),
+        supabase!.from("landmarks").select("*"),
         supabase!.from("users").select("id, display_name").eq("role", "fom"),
       ]);
 
@@ -185,10 +185,22 @@ export default function InvoicesPage() {
             ?.display_name || "", // Searchable text
       },
       {
+        key: "amount_paid",
+        label: "Amount Paid",
+        render: (row) => `₦${Number(row.amount_paid || 0).toLocaleString()}`,
+        getSearchableText: (row) => String(Number(row.amount_paid || 0)),
+      },
+      {
         key: "total_amount",
         label: "Order Amount",
         render: (row) => `₦${Number(row.total_amount || 0).toLocaleString()}`,
         getSearchableText: (row) => String(Number(row.total_amount || 0)),
+      },
+      {
+        key: "quantity_delivered",
+        label: "Quantity Delivered",
+        render: (row) => Number(row.quantity_delivered || 0).toLocaleString(),
+        getSearchableText: (row) => String(Number(row.quantity_delivered || 0)),
       },
       {
         key: "merchant",
