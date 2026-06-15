@@ -181,64 +181,10 @@ export default function DataTable({
   const [searchText, setSearchText] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<DataTableRow | null>(null);
-
-  // Drag-to-scroll state
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
-
-  const handleDragMouseDown = (e: React.MouseEvent) => {
-    if (!scrollContainerRef.current) return;
-
-    // Prevent dragging if the user is interacting with interactive elements
-    const target = e.target as HTMLElement;
-    if (
-      target.closest("button") ||
-      target.closest("input") ||
-      target.closest("select") ||
-      target.closest("textarea") ||
-      target.getAttribute("role") === "separator"
-    ) {
-      return;
-    }
-
-    setIsDragging(true);
-    dragStartRef.current = {
-      x: e.clientX,
-      scrollLeft: scrollContainerRef.current.scrollLeft,
-    };
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!scrollContainerRef.current) return;
-      e.preventDefault();
-      const deltaX = e.clientX - dragStartRef.current.x;
-      scrollContainerRef.current.scrollLeft =
-        dragStartRef.current.scrollLeft - deltaX;
-    };
-
-    const handleGlobalMouseUp = () => {
-      setIsDragging(false);
-      document.body.style.removeProperty("cursor");
-      document.body.style.removeProperty("user-select");
-    };
-
-    // Ensure grabbing cursor and no text selection globally during drag
-    document.body.style.setProperty("cursor", "grabbing", "important");
-    document.body.style.setProperty("user-select", "none", "important");
-
-    window.addEventListener("mousemove", handleGlobalMouseMove);
-    window.addEventListener("mouseup", handleGlobalMouseUp);
-    return () => {
-      document.body.style.removeProperty("cursor");
-      document.body.style.removeProperty("user-select");
-      window.removeEventListener("mousemove", handleGlobalMouseMove);
-      window.removeEventListener("mouseup", handleGlobalMouseUp);
-    };
-  }, [isDragging]);
+  // Removed drag-to-scroll state and logic to disable grab and pull scroll functionality.
+  // const [isDragging, setIsDragging] = useState(false);
+  // const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
 
   const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -374,10 +320,12 @@ export default function DataTable({
     const primary = getCellPrimary(value);
     const secondary = getCellSecondary(value);
     const textValue = String(primary ?? "");
-    const longText = column.longText || column.type === "textarea";
+    // Automatically treat text longer than 40 characters as "long text"
+    const isLongText =
+      column.longText || column.type === "textarea" || textValue.length > 40;
     const cellClass = cn(
       "min-w-0 overflow-hidden text-xs truncate w-full block",
-      longText && "cursor-pointer text-foreground",
+      isLongText && "cursor-pointer text-foreground",
     );
 
     if (isEditing && column.editable) {
@@ -401,7 +349,8 @@ export default function DataTable({
         );
       }
 
-      if (column.type === "textarea") {
+      // Use the dialog for editing if the field is marked as long text or explicitly a textarea
+      if (column.type === "textarea" || isLongText) {
         return (
           <button
             type="button"
@@ -422,7 +371,7 @@ export default function DataTable({
       );
     }
 
-    if (longText) {
+    if (isLongText) {
       return (
         <button
           type="button"
@@ -467,13 +416,7 @@ export default function DataTable({
 
       <div
         ref={scrollContainerRef}
-        onMouseDown={handleDragMouseDown}
-        className={cn(
-          "overflow-x-auto border rounded-md select-none",
-          isDragging ? "cursor-grabbing" : "cursor-grab",
-          isDragging && "scroll-smooth-none", // Custom class or inline style to prevent transition lag
-        )}
-        style={isDragging ? { scrollBehavior: "auto" } : undefined}
+        className="overflow-x-auto border rounded-md select-none"
       >
         <Table className="table-fixed w-full">
           <TableHeader>
