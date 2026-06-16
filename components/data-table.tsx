@@ -183,7 +183,6 @@ export default function DataTable({
   const [editRow, setEditRow] = useState<DataTableRow | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topDummyScrollRef = useRef<HTMLDivElement>(null);
-  const dummyScrollRef = useRef<HTMLDivElement>(null);
   const [contentWidth, setContentWidth] = useState(0);
   const [showStickyScroll, setShowStickyScroll] = useState(false);
   const isSyncingRef = useRef(false);
@@ -210,8 +209,6 @@ export default function DataTable({
     }
     const target = e.currentTarget;
     isSyncingRef.current = true;
-    if (dummyScrollRef.current)
-      dummyScrollRef.current.scrollLeft = target.scrollLeft;
     if (topDummyScrollRef.current)
       topDummyScrollRef.current.scrollLeft = target.scrollLeft;
   };
@@ -225,21 +222,6 @@ export default function DataTable({
     isSyncingRef.current = true;
     if (scrollContainerRef.current)
       scrollContainerRef.current.scrollLeft = target.scrollLeft;
-    if (dummyScrollRef.current)
-      dummyScrollRef.current.scrollLeft = target.scrollLeft;
-  };
-
-  const handleDummyScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isSyncingRef.current) {
-      isSyncingRef.current = false;
-      return;
-    }
-    const target = e.currentTarget;
-    isSyncingRef.current = true;
-    if (scrollContainerRef.current)
-      scrollContainerRef.current.scrollLeft = target.scrollLeft;
-    if (topDummyScrollRef.current)
-      topDummyScrollRef.current.scrollLeft = target.scrollLeft;
   };
 
   // Removed drag-to-scroll state and logic to disable grab and pull scroll functionality.
@@ -601,17 +583,6 @@ export default function DataTable({
             </TableBody>
           </table>
         </div>
-
-        {/* Sticky Horizontal Scrollbar */}
-        {showStickyScroll && (
-          <div
-            ref={dummyScrollRef}
-            onScroll={handleDummyScroll}
-            className="overflow-x-scroll z-20 bg-background border-t border-border h-3 w-full shrink-0 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30"
-          >
-            <div style={{ width: contentWidth, height: "1px" }} />
-          </div>
-        )}
       </div>
 
       <Dialog
