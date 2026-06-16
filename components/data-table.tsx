@@ -323,10 +323,6 @@ export default function DataTable({
     // Automatically treat text longer than 40 characters as "long text"
     const isLongText =
       column.longText || column.type === "textarea" || textValue.length > 40;
-    const cellClass = cn(
-      "min-w-0 overflow-hidden text-xs truncate w-full block",
-      isLongText && "cursor-pointer text-foreground",
-    );
 
     if (isEditing && column.editable) {
       if (column.type === "select" && Array.isArray(column.options)) {
@@ -349,16 +345,16 @@ export default function DataTable({
         );
       }
 
-      // Use the dialog for editing if the field is marked as long text or explicitly a textarea
+      // Inline editing: use Textarea for long text and Input for normal text
       if (column.type === "textarea" || isLongText) {
         return (
-          <button
-            type="button"
-            className="text-left text-sm text-foreground"
-            onClick={() => openDialog(rowIndex, column.key, textValue, true)}
-          >
-            {textValue || "Click to edit"}
-          </button>
+          <Textarea
+            value={textValue}
+            onChange={(event) =>
+              handleCellChange(column.key, event.target.value)
+            }
+            className="text-xs min-h-20 p-2"
+          />
         );
       }
 
@@ -371,33 +367,31 @@ export default function DataTable({
       );
     }
 
-    if (isLongText) {
-      return (
-        <button
-          type="button"
-          className={cn("text-left text-xs text-foreground w-full", cellClass)}
-          onClick={() => openDialog(rowIndex, column.key, textValue, false)}
-        >
-          <div className="truncate">{primary}</div>
-          {secondary ? (
-            <div className="text-[10px] text-muted-foreground truncate">
-              {secondary}
-            </div>
-          ) : null}
-        </button>
-      );
-    }
-
-    return (
-      <div className="text-xs truncate py-1">
-        <div className="truncate">{primary}</div>
+    const displayContent = (
+      <div className="text-xs py-1 wrap-anywhere whitespace-normal w-full">
+        <div className="wrap-anywhere whitespace-normal">{primary}</div>
         {secondary ? (
-          <div className="text-[10px] text-muted-foreground truncate">
+          <div className="text-[10px] text-muted-foreground wrap-anywhere whitespace-normal">
             {secondary}
           </div>
         ) : null}
       </div>
     );
+
+    // For long text, allow opening a dialog to see/edit in a larger Textarea
+    if (isLongText) {
+      return (
+        <button
+          type="button"
+          className="text-left w-full hover:bg-muted/40 transition-colors rounded p-1 wrap-anywhere whitespace-normal"
+          onClick={() => openDialog(rowIndex, column.key, textValue, false)}
+        >
+          {displayContent}
+        </button>
+      );
+    }
+
+    return displayContent;
   };
 
   return (
@@ -483,12 +477,7 @@ export default function DataTable({
                           width: columnWidths[column.key],
                           minWidth: "80px",
                         }}
-                        className={cn(
-                          "border-r border-border overflow-hidden py-1.5 px-3 group-hover:bg-transparent",
-                          column.longText || column.type === "textarea"
-                            ? "max-w-xs"
-                            : "bg-white",
-                        )}
+                        className="border-r border-border py-1.5 px-3 group-hover:bg-transparent bg-white overflow-hidden max-w-0 wrap-anywhere whitespace-normal"
                       >
                         {renderCellContent(row, column, rowIndex, isEditing)}
                       </TableCell>
@@ -565,9 +554,11 @@ export default function DataTable({
                 className="min-h-40"
               />
             ) : (
-              <div className="whitespace-pre-wrap wrap-break-word text-sm text-foreground">
-                {dialogContext?.content}
-              </div>
+              <Textarea
+                readOnly
+                value={dialogContext?.content}
+                className="min-h-60 bg-muted/30 font-mono text-xs"
+              />
             )}
           </div>
 
