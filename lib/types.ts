@@ -53,9 +53,9 @@ export interface Order {
   items: OrderItem[];
   total_amount: number;
   status: UserRole; // Reflects which department is currently handling the order
-  warehouse_delivery_status?: string | null;
+  inventory_status?: string | null; // delivery status for warehouse dashboard
   fom_delivery_status?: string | null;
-  inventory_status?: string | null;
+  warehouse_status?: string | null;
   warehouse_comment?: string | null;
   fom_assigned?: string | null;
   rider_name?: string | null;

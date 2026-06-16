@@ -186,10 +186,9 @@ export default function AdminOrdersPage() {
           merchant: editForm.merchant,
           items: editForm.items,
           total_amount: editForm.total_amount,
-          warehouse_delivery_status:
-            editForm.warehouse_delivery_status?.toLowerCase(),
+          inventory_status: editForm.inventory_status?.toLowerCase(),
           fom_delivery_status: editForm.fom_delivery_status?.toLowerCase(),
-          inventory_status: (editForm as any).inventory_status?.toLowerCase(),
+          warehouse_status: (editForm as any).warehouse_status?.toLowerCase(),
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
           rider_name: (editForm as any).rider_name,
@@ -434,16 +433,16 @@ export default function AdminOrdersPage() {
             <div className="py-1 flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[8px] uppercase text-muted-foreground font-bold">
-                  WH:
+                  IN:
                 </span>
                 {isEditing ? (
                   <select
                     className="h-6 text-[9px] rounded border px-1"
-                    value={editForm?.warehouse_delivery_status || ""}
+                    value={editForm?.inventory_status || ""}
                     onChange={(e) =>
                       setEditForm((p: any) => ({
                         ...p,
-                        warehouse_delivery_status: e.target.value,
+                        inventory_status: e.target.value,
                       }))
                     }
                   >
@@ -463,12 +462,12 @@ export default function AdminOrdersPage() {
                   <span
                     className={cn(
                       "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-sm",
-                      String(row.warehouse_delivery_status) === "delivered"
+                      String(row.inventory_status) === "delivered"
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-muted text-muted-foreground",
                     )}
                   >
-                    {String(row.warehouse_delivery_status || "pending")}
+                    {String(row.inventory_status || "pending")}
                   </span>
                 )}
               </div>
@@ -516,7 +515,7 @@ export default function AdminOrdersPage() {
           );
         },
         getSearchableText: (row) =>
-          `${String(row.warehouse_delivery_status)} ${String(row.fom_delivery_status)}`,
+          `${String(row.inventory_status)} ${String(row.fom_delivery_status)}`,
       },
       {
         key: "dispatch",
@@ -863,7 +862,7 @@ export default function AdminOrdersPage() {
     const delivered = orders.filter(
       (order) =>
         order.fom_delivery_status === "delivered" ||
-        order.warehouse_delivery_status === "delivered",
+        order.inventory_status === "delivered",
     ).length;
     const failed = orders.filter(
       (order) =>

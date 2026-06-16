@@ -82,7 +82,7 @@ create policy admin_audit_dev_allow_all on public.admin_audit for all using (tru
 -- =====================
 -- orders
 -- Note: `delivery_status` (shared) removed. We have role-specific fields:
---  - warehouse_delivery_status
+--  - inventory_status
 --  - fom_delivery_status
 -- Keep `status` to indicate which department currently handles the order.
 -- =====================
@@ -97,9 +97,9 @@ create table if not exists public.orders (
   items jsonb not null,
   total_amount numeric(12,2) default 0,
   status text not null default 'customer_service',
-  warehouse_delivery_status text not null default 'pending',
+  inventory_status text not null default 'pending',
   fom_delivery_status text not null default 'pending',
-  inventory_status text not null default 'unpacked',
+  warehouse_status text not null default 'unpacked',
   warehouse_comment text,
   fom_assigned uuid references public.users(id) on delete set null,
   rider_name text,
@@ -231,7 +231,7 @@ insert into public.settings (key, value) values
 on conflict (key) do update set value = excluded.value;
 
 -- Sample orders (note: we populate both warehouse and fom delivery status)
-insert into public.orders (order_reference, customer_name, delivery_address, phone_numbers, merchant, cc_comment, items, total_amount, warehouse_delivery_status, fom_delivery_status, inventory_status, fom_assigned, fom_comment, extracted_by, created_at, updated_at)
+insert into public.orders (order_reference, customer_name, delivery_address, phone_numbers, merchant, cc_comment, items, total_amount, inventory_status, fom_delivery_status, warehouse_status, fom_assigned, fom_comment, extracted_by, created_at, updated_at)
 values
   ('RCH-0001','Demo Customer A','22 Bishop Street, Surulere, Lagos','["08012345678","08087654321"]','Merchant A','Extracted via demo','[{"name":"Product A","quantity":5,"weight":2}]',500.00,'pending','pending','unpacked','77777777-7777-7777-7777-777777777777','Extracted via demo','22222222-2222-2222-2222-222222222222', now(), now()),
   ('RCH-0002','Warehouse Customer B','14 Ilupeju Road, Ikeja, Lagos','["08123456789"]','Merchant B',null,'[{"name":"Product B","quantity":3}]',300.00,'processing','processing','packed','44444444-4444-4444-4444-444444444444',null,'33333333-3333-3333-3333-333333333333', now(), now())

@@ -97,9 +97,9 @@ CREATE TABLE public.orders (
   created_at timestamp with time zone,
   updated_at timestamp with time zone,
   delivery_status delivery_status,
-  warehouse_delivery_status text not null default 'pending',
+  inventory_status text not null default 'pending',
   fom_delivery_status text not null default 'pending',
-  inventory_status inventory_status,
+  warehouse_status warehouse_status,
   status role
 );
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -155,7 +155,7 @@ INSERT INTO public.orders (
     created_at,
     updated_at,
     delivery_status,
-    inventory_status,
+    warehouse_status,
     status
   )
 VALUES (
@@ -197,7 +197,7 @@ INSERT INTO public.orders (
     created_at,
     updated_at,
     delivery_status,
-    inventory_status,
+    warehouse_status,
     status
   )
 VALUES (
@@ -241,7 +241,7 @@ INSERT INTO public.orders (
     created_at,
     updated_at,
     delivery_status,
-    inventory_status,
+    warehouse_status,
     status
   )
 VALUES (

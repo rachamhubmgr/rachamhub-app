@@ -122,18 +122,16 @@ export default function InventoryPage() {
         getSearchableText: (row) => (row.merchant as any) || "",
       },
       {
-        key: "warehouse_delivery_status",
-        label: "Delivery Status",
+        key: "inventory_status",
+        label: "Inventory Del. Status",
         render: (row) =>
           editingId === String(row.id) ? (
             <select
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
-              value={(editForm as any)?.warehouse_delivery_status || ""}
+              value={(editForm as any)?.inventory_status || ""}
               onChange={(e) =>
                 setEditForm((prev) =>
-                  prev
-                    ? { ...prev, warehouse_delivery_status: e.target.value }
-                    : prev,
+                  prev ? { ...prev, inventory_status: e.target.value } : prev,
                 )
               }
             >
@@ -149,22 +147,19 @@ export default function InventoryPage() {
             <span
               className={cn(
                 "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                STATUS_STYLES[
-                  (row.warehouse_delivery_status as any) || "pending"
-                ],
+                STATUS_STYLES[(row.inventory_status as any) || "pending"],
               )}
             >
-              {(row.warehouse_delivery_status as any) || "pending"}
+              {(row.inventory_status as any) || "pending"}
             </span>
           ),
-        getSearchableText: (row) =>
-          (row.warehouse_delivery_status as any) || "pending",
+        getSearchableText: (row) => (row.inventory_status as any) || "pending",
       },
       {
-        key: "inventory_status",
-        label: "Inventory Status",
-        render: (row) => (row as any).inventory_status || "unpacked",
-        getSearchableText: (row) => (row as any).inventory_status || "unpacked",
+        key: "warehouse_status",
+        label: "Warehouse Status",
+        render: (row) => (row as any).warehouse_status || "unpacked",
+        getSearchableText: (row) => (row as any).warehouse_status || "unpacked",
       },
       {
         key: "fom_assigned",
@@ -270,9 +265,8 @@ export default function InventoryPage() {
         .from("orders")
         .update({
           status: "warehouse",
-          warehouse_delivery_status:
-            editForm.warehouse_delivery_status?.toLowerCase(),
-          inventory_status: (editForm as any).inventory_status?.toLowerCase(),
+          inventory_status: editForm.inventory_status?.toLowerCase(),
+          warehouse_status: (editForm as any).warehouse_status?.toLowerCase(),
           fom_assigned: (editForm as any).fom_assigned,
           warehouse_comment: (editForm as any).warehouse_comment,
           updated_at: new Date().toISOString(),

@@ -182,6 +182,66 @@ export default function DataTable({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<DataTableRow | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const topDummyScrollRef = useRef<HTMLDivElement>(null);
+  const dummyScrollRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [showStickyScroll, setShowStickyScroll] = useState(false);
+  const isSyncingRef = useRef(false);
+
+  // Synchronize content width and detect if horizontal scroll is needed
+  const updateScrollDimensions = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollWidth, clientWidth } = scrollContainerRef.current;
+      setContentWidth(scrollWidth);
+      setShowStickyScroll(scrollWidth > clientWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateScrollDimensions();
+    window.addEventListener("resize", updateScrollDimensions);
+    return () => window.removeEventListener("resize", updateScrollDimensions);
+  }, [updateScrollDimensions, tableRows, columns]);
+
+  const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingRef.current) {
+      isSyncingRef.current = false;
+      return;
+    }
+    const target = e.currentTarget;
+    isSyncingRef.current = true;
+    if (dummyScrollRef.current)
+      dummyScrollRef.current.scrollLeft = target.scrollLeft;
+    if (topDummyScrollRef.current)
+      topDummyScrollRef.current.scrollLeft = target.scrollLeft;
+  };
+
+  const handleTopDummyScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingRef.current) {
+      isSyncingRef.current = false;
+      return;
+    }
+    const target = e.currentTarget;
+    isSyncingRef.current = true;
+    if (scrollContainerRef.current)
+      scrollContainerRef.current.scrollLeft = target.scrollLeft;
+    if (dummyScrollRef.current)
+      dummyScrollRef.current.scrollLeft = target.scrollLeft;
+  };
+
+  const handleDummyScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingRef.current) {
+      isSyncingRef.current = false;
+      return;
+    }
+    const target = e.currentTarget;
+    isSyncingRef.current = true;
+    if (scrollContainerRef.current)
+      scrollContainerRef.current.scrollLeft = target.scrollLeft;
+    if (topDummyScrollRef.current)
+      topDummyScrollRef.current.scrollLeft = target.scrollLeft;
+  };
+
   // Removed drag-to-scroll state and logic to disable grab and pull scroll functionality.
   // const [isDragging, setIsDragging] = useState(false);
   // const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
@@ -408,122 +468,150 @@ export default function DataTable({
         />
       ) : null}
 
-      <div
-        ref={scrollContainerRef}
-        className="overflow-x-auto border rounded-md select-none"
-      >
-        <Table className="table-fixed w-full">
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={column.key}
-                  style={{ width: columnWidths[column.key], minWidth: "80px" }}
-                  className="relative overflow-hidden bg-muted/40 border-r border-border h-9 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{column.label}</span>
-                  </div>
-                  {column.resizable ? (
-                    <div
-                      role="separator"
-                      onMouseDown={(event) => {
-                        resizingRef.current = {
-                          key: column.key,
-                          startX: event.clientX,
-                          startWidth:
-                            Number(
-                              columnWidths[column.key]?.replace("px", ""),
-                            ) || 180,
-                        };
-                      }}
-                      className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
-                    />
-                  ) : null}
-                </TableHead>
-              ))}
-              {showActions ? (
-                <TableHead className="text-left bg-muted/40 border-r border-border h-9 text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24">
-                  {actionLabel}
-                </TableHead>
-              ) : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredRows.length === 0 ? (
+      <div className="relative border rounded-md bg-background h-110 flex flex-col overflow-hidden shadow-sm">
+        {/* Top Sticky Horizontal Scrollbar */}
+        {showStickyScroll && (
+          <div
+            ref={topDummyScrollRef}
+            onScroll={handleTopDummyScroll}
+            className="overflow-x-auto z-40 bg-background border-b border-border h-3 w-full shrink-0 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30"
+          >
+            <div style={{ width: contentWidth, height: "1px" }} />
+          </div>
+        )}
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleMainScroll}
+          className="flex-1 overflow-auto select-none [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-0 [-ms-overflow-style:none] scrollbar-thin relative"
+        >
+          <table className="table-fixed w-full border-collapse relative">
+            <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-md shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
               <TableRow>
-                <TableCell
-                  colSpan={
-                    columns.length + (showActions || renderRowActions ? 1 : 0)
-                  }
-                  className="h-24 text-center text-muted-foreground text-xs"
-                >
-                  No orders available to be displayed
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredRows.map((row, rowIndex) => {
-                const isEditing = editingIndex === rowIndex;
-                const rowId = row[rowKey] ?? rowIndex;
-                return (
-                  <TableRow
-                    key={String(rowId)}
-                    className="hover:bg-muted/20 transition-colors border-b border-border group"
+                {columns.map((column) => (
+                  <th
+                    key={column.key}
+                    style={{
+                      width: columnWidths[column.key],
+                      minWidth: "80px",
+                    }}
+                    className="overflow-hidden border-r border-border h-10 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground align-middle"
                   >
-                    {columns.map((column) => (
-                      <TableCell
-                        key={`${String(rowId)}-${column.key}`}
-                        style={{
-                          width: columnWidths[column.key],
-                          minWidth: "80px",
+                    <div className="flex items-center gap-2">
+                      <span>{column.label}</span>
+                    </div>
+                    {column.resizable ? (
+                      <div
+                        role="separator"
+                        onMouseDown={(event) => {
+                          resizingRef.current = {
+                            key: column.key,
+                            startX: event.clientX,
+                            startWidth:
+                              Number(
+                                columnWidths[column.key]?.replace("px", ""),
+                              ) || 180,
+                          };
                         }}
-                        className="border-r border-border py-1.5 px-3 group-hover:bg-transparent bg-white overflow-hidden max-w-0 wrap-anywhere whitespace-normal"
-                      >
-                        {renderCellContent(row, column, rowIndex, isEditing)}
-                      </TableCell>
-                    ))}
-                    {renderRowActions ? (
-                      <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
-                        {renderRowActions(row, rowIndex, isEditing, editRow)}
-                      </TableCell>
-                    ) : showActions ? (
-                      <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
-                        {isEditing ? (
-                          <div className="flex justify-start gap-2">
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={saveEdit}
-                            >
-                              <Check className="h-4 w-4 text-emerald-500" />
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={cancelEditing}
-                            >
-                              <X className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-start gap-2">
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={() => startEditing(rowIndex)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
+                        className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
+                      />
                     ) : null}
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                  </th>
+                ))}
+                {showActions ? (
+                  <th className="text-left border-r border-border h-10 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24 align-middle">
+                    {actionLabel}
+                  </th>
+                ) : null}
+              </TableRow>
+            </thead>
+            <TableBody>
+              {filteredRows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={
+                      columns.length + (showActions || renderRowActions ? 1 : 0)
+                    }
+                    className="h-24 text-center text-muted-foreground text-xs"
+                  >
+                    No orders available to be displayed
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredRows.map((row, rowIndex) => {
+                  const isEditing = editingIndex === rowIndex;
+                  const rowId = row[rowKey] ?? rowIndex;
+                  return (
+                    <TableRow
+                      key={String(rowId)}
+                      className="hover:bg-muted/20 transition-colors border-b border-border group"
+                    >
+                      {columns.map((column) => (
+                        <TableCell
+                          key={`${String(rowId)}-${column.key}`}
+                          style={{
+                            width: columnWidths[column.key],
+                            minWidth: "80px",
+                          }}
+                          className="border-r border-border py-1.5 px-3 group-hover:bg-transparent bg-white overflow-hidden max-w-0 wrap-anywhere whitespace-normal"
+                        >
+                          {renderCellContent(row, column, rowIndex, isEditing)}
+                        </TableCell>
+                      ))}
+                      {renderRowActions ? (
+                        <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
+                          {renderRowActions(row, rowIndex, isEditing, editRow)}
+                        </TableCell>
+                      ) : showActions ? (
+                        <TableCell className="text-left bg-white group-hover:bg-transparent border-r border-border w-24">
+                          {isEditing ? (
+                            <div className="flex justify-start gap-2">
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={saveEdit}
+                              >
+                                <Check className="h-4 w-4 text-emerald-500" />
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={cancelEditing}
+                              >
+                                <X className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-start gap-2">
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => startEditing(rowIndex)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </table>
+        </div>
+
+        {/* Sticky Horizontal Scrollbar */}
+        {showStickyScroll && (
+          <div
+            ref={dummyScrollRef}
+            onScroll={handleDummyScroll}
+            className="overflow-x-scroll z-20 bg-background border-t border-border h-3 w-full shrink-0 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30"
+          >
+            <div style={{ width: contentWidth, height: "1px" }} />
+          </div>
+        )}
       </div>
 
       <Dialog

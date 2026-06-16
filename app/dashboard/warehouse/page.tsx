@@ -281,34 +281,34 @@ export default function WarehouseOrdersPage() {
         getSearchableText: (row) => (row.cc_comment as any) || "",
       },
       {
-        key: "warehouse_delivery_status",
+        key: "inventory_status",
         label: "Delivery Status",
         render: (row) => (
           <span
             className={cn(
               "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-              STATUS_STYLES[
-                (row.warehouse_delivery_status as any) || "pending"
-              ],
+              STATUS_STYLES[(row.inventory_status as any) || "pending"],
             )}
           >
-            {(row.warehouse_delivery_status as any) || "pending"}
+            {(row.inventory_status as any) || "pending"}
           </span>
         ),
-        getSearchableText: (row) =>
-          (row.warehouse_delivery_status as any) || "pending",
+        getSearchableText: (row) => (row.inventory_status as any) || "pending",
       },
       {
-        key: "inventory_status",
-        label: "Inventory Status",
+        key: "warehouse_status",
+        label: "Warehouse Status",
         render: (row) =>
           editingId === String(row.id) ? (
             <select
-              value={(editForm as any)?.inventory_status || "Unpacked"}
+              value={(editForm as any)?.warehouse_status || "Unpacked"}
               onChange={(e) =>
                 setEditForm((prev) =>
                   prev
-                    ? { ...prev, inventory_status: e.target.value as any }
+                    ? {
+                        ...prev,
+                        warehouse_status: e.target.value as any,
+                      }
                     : null,
                 )
               }
@@ -319,9 +319,9 @@ export default function WarehouseOrdersPage() {
               <option value="out of stock">out of stock</option>
             </select>
           ) : (
-            (row as any).inventory_status || "Unpacked"
+            (row as any).warehouse_status || "Unpacked"
           ),
-        getSearchableText: (row) => (row as any).inventory_status || "Unpacked",
+        getSearchableText: (row) => (row as any).warehouse_status || "Unpacked",
       },
       {
         key: "fom_assigned",
@@ -398,7 +398,7 @@ export default function WarehouseOrdersPage() {
     if (!editForm || !supabase) return;
 
     const assignedFom = (editForm as any).fom_assigned;
-    const inventoryStatus = (editForm as any).inventory_status;
+    const inventoryStatus = (editForm as any).warehouse_status;
     const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
 
     if (!inventoryStatus) {
@@ -419,9 +419,8 @@ export default function WarehouseOrdersPage() {
         .from("orders")
         .update({
           status: "warehouse",
-          warehouse_delivery_status:
-            editForm.warehouse_delivery_status?.toLowerCase(),
-          inventory_status: inventoryStatus.toLowerCase(),
+          inventory_status: editForm.inventory_status?.toLowerCase(),
+          warehouse_status: inventoryStatus.toLowerCase(),
           fom_assigned: validFomId,
           warehouse_comment: (editForm as any).warehouse_comment,
           fom_assigned_at: new Date().toISOString(),
@@ -456,7 +455,7 @@ export default function WarehouseOrdersPage() {
 
   const canSaveWarehouseUpdate = useMemo(() => {
     if (!editForm) return false;
-    const inventoryStatus = (editForm as any).inventory_status;
+    const inventoryStatus = (editForm as any).warehouse_status;
     const assignedFom = (editForm as any).fom_assigned;
     return Boolean(inventoryStatus && assignedFom);
   }, [editForm]);
