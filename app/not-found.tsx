@@ -28,7 +28,7 @@ export default function NotFound() {
         <Button
           asChild
           variant="default"
-          className="gap-2 bg-[#1B7A3E] hover:bg-[#1B7A3E]/90"
+          className="gap-2 bg-primary hover:bg-primary/90"
         >
           <Link href="/dashboard">
             <ArrowLeft size={16} />
