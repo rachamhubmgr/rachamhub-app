@@ -185,14 +185,19 @@ export default function FOMOrdersPage() {
       {
         key: "customer",
         label: "Customer / Address",
-        render: (row) => (
+        render: (row, index, isEditing, editRow, openDialog) => (
           <div className="py-1">
             <div className="text-xs font-semibold truncate">
               {(row.customer_name as any) || "—"}
             </div>
-            <div className="text-[10px] text-muted-foreground truncate">
+            <button
+              type="button"
+              className="text-[10px] text-muted-foreground truncate hover:underline text-left w-full"
+              onClick={() => openDialog?.(String(row.delivery_address ?? ""))}
+              title="Click to view full address"
+            >
               {(row.delivery_address as any) || "—"}
-            </div>
+            </button>
           </div>
         ),
         getSearchableText: (row) =>
@@ -377,7 +382,7 @@ export default function FOMOrdersPage() {
       },
       {
         key: "amount_paid",
-        label: "Amount Paid",
+        label: "Amount Paid (₦)",
         render: (row) => {
           const isEditing = editingId === String(row.id);
           if (isEditing) {
@@ -397,7 +402,7 @@ export default function FOMOrdersPage() {
               />
             );
           }
-          return (row as any).amount_paid || "—";
+          return `₦${(row as any).amount_paid}` || "—";
         },
         getSearchableText: (row) => (row as any).amount_paid || "",
       },

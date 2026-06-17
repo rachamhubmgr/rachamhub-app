@@ -220,14 +220,20 @@ export default function FOMDashboard() {
       {
         key: "customer",
         label: "Customer / Address",
-        render: (row) => (
+        longText: true,
+        render: (row, index, isEditing, editRow, openDialog) => (
           <div className="py-1">
             <div className="text-xs font-semibold truncate">
               {row.customer_name as any}
             </div>
-            <div className="text-[10px] text-muted-foreground truncate">
+            <button
+              type="button"
+              className="text-[10px] text-muted-foreground truncate hover:underline text-left w-full"
+              onClick={() => openDialog?.(String(row.delivery_address ?? ""))}
+              title="Click to view full address"
+            >
               {row.delivery_address as any}
-            </div>
+            </button>
           </div>
         ),
         getSearchableText: (row) =>
@@ -236,6 +242,7 @@ export default function FOMDashboard() {
       {
         key: "items",
         label: "Products",
+        longText: true,
         render: (row) => (
           <div className="text-xs truncate">
             {((row.items as any[]) || [])

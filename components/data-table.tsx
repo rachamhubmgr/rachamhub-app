@@ -60,6 +60,7 @@ export type DataTableColumn = {
     rowIndex: number,
     isEditing: boolean,
     editRow: DataTableRow | null,
+    openDialog?: (content: string) => void,
   ) => React.ReactNode;
   className?: string;
 };
@@ -187,6 +188,15 @@ export default function DataTable({
   const [showStickyScroll, setShowStickyScroll] = useState(false);
   const isSyncingRef = useRef(false);
 
+  const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      columns.map((column) => [
+        column.key,
+        column.width ? String(column.width) : "180px",
+      ]),
+    ),
+  );
+
   // Synchronize content width and detect if horizontal scroll is needed
   const updateScrollDimensions = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -200,7 +210,7 @@ export default function DataTable({
     updateScrollDimensions();
     window.addEventListener("resize", updateScrollDimensions);
     return () => window.removeEventListener("resize", updateScrollDimensions);
-  }, [updateScrollDimensions, tableRows, columns]);
+  }, [updateScrollDimensions, tableRows, columns, columnWidths]);
 
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (isSyncingRef.current) {
@@ -228,14 +238,6 @@ export default function DataTable({
   // const [isDragging, setIsDragging] = useState(false);
   // const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
 
-  const [columnWidths, setColumnWidths] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      columns.map((column) => [
-        column.key,
-        column.width ? String(column.width) : "180px",
-      ]),
-    ),
-  );
   const [dialogContext, setDialogContext] = useState<DialogContext | null>(
     null,
   );
@@ -355,7 +357,13 @@ export default function DataTable({
     isEditing: boolean,
   ) => {
     if (column.render) {
-      return column.render(row, rowIndex, isEditing, editRow);
+      return column.render(
+        row,
+        rowIndex,
+        isEditing,
+        editRow,
+        (content: string) => openDialog(rowIndex, column.key, content, false),
+      );
     }
 
     const value = isEditing && editRow ? editRow[column.key] : row[column.key];
@@ -451,7 +459,7 @@ export default function DataTable({
       ) : null}
 
       <div className="relative border rounded-md bg-background h-110 flex flex-col overflow-hidden shadow-sm">
-        {/* Top Sticky Horizontal Scrollbar */}
+        {/* Top Sticky Horizontal Scrollbar 
         {showStickyScroll && (
           <div
             ref={topDummyScrollRef}
@@ -461,6 +469,7 @@ export default function DataTable({
             <div style={{ width: contentWidth, height: "1px" }} />
           </div>
         )}
+        */}
 
         <div
           ref={scrollContainerRef}
@@ -477,7 +486,7 @@ export default function DataTable({
                       width: columnWidths[column.key],
                       minWidth: "80px",
                     }}
-                    className="overflow-hidden border-r border-border h-10 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground align-middle"
+                    className="relative overflow-hidden border-r border-border h-10 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground align-middle"
                   >
                     <div className="flex items-center gap-2">
                       <span>{column.label}</span>
@@ -501,7 +510,7 @@ export default function DataTable({
                   </th>
                 ))}
                 {showActions ? (
-                  <th className="text-left border-r border-border h-10 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24 align-middle">
+                  <th className="relative text-left border-r border-border h-10 px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24 align-middle">
                     {actionLabel}
                   </th>
                 ) : null}
