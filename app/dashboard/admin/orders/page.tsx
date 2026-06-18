@@ -379,12 +379,10 @@ export default function AdminOrdersPage() {
           const total = Number(
             (isEditing ? editForm?.total_amount : row.total_amount) || 0,
           );
-          const riderFee = Number(
-            (isEditing
-              ? (editForm as any)?.payment_to_rider
-              : (row as any).payment_to_rider) || 0,
+          const landmarkfee = Number(
+            landmarks!.find((l) => l.name === row.landmark)?.price || 0,
           );
-          const toMerchant = total - riderFee;
+          const toMerchant = total - landmarkfee;
           return (
             <div className="py-1 space-y-0.5">
               {isEditing ? (
@@ -407,7 +405,8 @@ export default function AdminOrdersPage() {
                 <div className="text-xs font-bold">{formatCurrency(total)}</div>
               )}
               <div className="text-[9px] text-muted-foreground">
-                Rider: {formatCurrency(riderFee)}
+                Landmark:{" "}
+                {`${row.landmark || "—"} * ${formatCurrency(landmarkfee)}`}
               </div>
               <div className="text-[10px] text-emerald-600 font-semibold">
                 Merchant: {formatCurrency(toMerchant)}
