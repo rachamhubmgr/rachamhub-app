@@ -181,6 +181,12 @@ export default function PaymentsPage() {
       render: (row) => (row as any).payment_method || "—",
       getSearchableText: (row) => (row.payment_method as any) || "",
     },
+    {
+      key: "fom_comment",
+      label: "FOM Comment",
+      render: (row) => (row.fom_comment as any) || "—",
+      getSearchableText: (row) => (row.fom_comment as any) || "",
+    },
   ];
 
   useSupabaseRealtime([{ table: "landmarks", event: "*" }], fetchData, []);
@@ -208,9 +214,11 @@ export default function PaymentsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
-          <ExportButton 
-            disabled={loading || orders.length === 0} 
-            onExport={async (start, end, type) => await handleExport(foms, ccUsers, type, start, end)} 
+          <ExportButton
+            disabled={loading || orders.length === 0}
+            onExport={async (start, end, type) =>
+              await handleExport(foms, ccUsers, type, start, end)
+            }
           />
         </div>
       </div>
