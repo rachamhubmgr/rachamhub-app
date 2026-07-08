@@ -27,6 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn, handleExport } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -496,20 +497,11 @@ export default function OrdersPage() {
           <p className="text-muted-foreground mt-2">
             Review customer orders and track their workflow across the system.
           </p>{" "}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => handleExport(fomUsers, ccUsers, "csv")}
-              disabled={loading || orders.length === 0}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleExport(fomUsers, ccUsers, "xlsx")}
-              disabled={loading || orders.length === 0}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
-            </Button>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <ExportButton 
+              disabled={loading || orders.length === 0} 
+              onExport={async (start, end, type) => await handleExport(fomUsers, ccUsers, type, start, end)} 
+            />
           </div>
         </div>
       </div>

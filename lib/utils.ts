@@ -15,11 +15,20 @@ export function formatDateDisplay(input: Date) {
   });
 }
 
-const getOrders = async () => {
-  const { data, error: fetchError } = await supabase!
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
+const getOrders = async (startDate?: Date, endDate?: Date) => {
+  let query = supabase!.from("orders").select("*");
+  
+  if (startDate) {
+    query = query.gte("created_at", startDate.toISOString());
+  }
+  
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    query = query.lte("created_at", end.toISOString());
+  }
+
+  const { data, error: fetchError } = await query.order("created_at", { ascending: false });
 
   return { data, fetchError };
 };
@@ -118,8 +127,10 @@ export const handleExport = async (
   fomUsers: any[] = [],
   ccUsers: any[] = [],
   type: "csv" | "xlsx" = "csv",
+  startDate?: Date,
+  endDate?: Date
 ) => {
-  const { data: orders } = await getOrders();
+  const { data: orders } = await getOrders(startDate, endDate);
   if (type === "xlsx") {
     const { headers, rows } = prepareExportData(orders!, fomUsers, ccUsers);
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);

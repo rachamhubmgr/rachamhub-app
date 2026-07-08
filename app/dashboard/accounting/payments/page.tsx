@@ -10,6 +10,7 @@ import DataTable, { type DataTableColumn } from "@/components/data-table";
 import OrderSearchFilter from "@/components/order-search-filter";
 import { Button } from "@/components/ui/button";
 import { handleExport } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
 
 export default function PaymentsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -206,20 +207,11 @@ export default function PaymentsPage() {
             Review confirmed payments and completed orders.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => handleExport(foms, ccUsers, "csv")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleExport(foms, ccUsers, "xlsx")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
-          </Button>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <ExportButton 
+            disabled={loading || orders.length === 0} 
+            onExport={async (start, end, type) => await handleExport(foms, ccUsers, type, start, end)} 
+          />
         </div>
       </div>
 

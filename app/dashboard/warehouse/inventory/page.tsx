@@ -8,6 +8,7 @@ import { Check, Download, Edit2, Loader2, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn, handleExport } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
@@ -370,20 +371,11 @@ export default function InventoryPage() {
           <p className="text-muted-foreground mt-2">
             Track stock levels and manage items across orders.
           </p>{" "}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => handleExport(fomUsers, ccUsers, "csv")}
-              disabled={loading || orders.length === 0}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleExport(fomUsers, ccUsers, "xlsx")}
-              disabled={loading || orders.length === 0}
-            >
-              <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
-            </Button>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <ExportButton 
+              disabled={loading || orders.length === 0} 
+              onExport={async (start, end, type) => await handleExport(fomUsers, ccUsers, type, start, end)} 
+            />
           </div>
         </div>
       </div>

@@ -1,10 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ExtractedOrder, GeminiResponse } from "@/lib/types";
 
-// Initialize Gemini API client
-const gemini_api_key = process.env.GOOGLE_GEMINI_API_KEY;
-
-const gemini = new GoogleGenerativeAI(gemini_api_key!);
 
 const EXTRACTION_PROMPT = `
 You are an order extraction AI for RachamHub, a Lagos-based logistics company.
@@ -40,23 +36,29 @@ Text to extract from:
 
 export async function POST(request: Request) {
   try {
+    // Parse request body
+    const { text, apiKeyId } = await request.json();
+
+    // Select the appropriate API key
+    let selectedApiKey = process.env.GOOGLE_GEMINI_API_KEY;
+    if (apiKeyId && apiKeyId !== "DEFAULT") {
+      selectedApiKey = process.env[`GOOGLE_GEMINI_API_KEY_${apiKeyId}`];
+    }
+
     // Validate API key
-    if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    if (!selectedApiKey) {
       console.error(
-        "[Gemini API] Missing GOOGLE_GEMINI_API_KEY environment variable",
+        `[Gemini API] Missing API key for selection: ${apiKeyId || "DEFAULT"}`,
       );
       return Response.json(
         {
           success: false,
           error:
-            "Gemini API is not configured. Please set GOOGLE_GEMINI_API_KEY.",
+            "Selected Gemini API key is not configured.",
         },
         { status: 500 },
       );
     }
-
-    // Parse request body
-    const { text } = await request.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return Response.json(
@@ -67,6 +69,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    // Initialize Gemini API client
+    const gemini = new GoogleGenerativeAI(selectedApiKey);
 
     // Call Gemini API
     const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });

@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { buildCsv, cn, formatDateDisplay, handleExport } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
 
 const formatCurrency = (value: number) =>
   `₦${Number(value || 0).toLocaleString()}`;
@@ -904,19 +905,10 @@ export default function AdminOrdersPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => handleExport(fomUsers, ccUsers, "csv")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleExport(fomUsers, ccUsers, "xlsx")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
-          </Button>
+          <ExportButton 
+            disabled={loading || orders.length === 0} 
+            onExport={async (start, end, type) => await handleExport(fomUsers, ccUsers, type, start, end)} 
+          />
         </div>
       </div>
 

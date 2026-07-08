@@ -11,6 +11,7 @@ import { Order } from "@/lib/types";
 import { Check, Loader2, X, Edit2, Download } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import { cn, handleExport } from "@/lib/utils";
+import { ExportButton } from "@/components/export-button";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 
@@ -40,6 +41,7 @@ export default function FOMOrdersPage() {
   const [foms, setFoms] = useState<any[]>([]);
   const [ccUsers, setCcUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [landmarks, setLandmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export default function FOMOrdersPage() {
       const [
         { data: ordersData, error: fetchError },
         { data: merchantsData },
+        { data: landmarkData },
         { data: fomUserData },
         { data: ccUserData },
       ] = await Promise.all([
@@ -71,6 +74,11 @@ export default function FOMOrdersPage() {
           .select("name")
           .eq("is_active", true)
           .order("name"),
+        supabase!
+          .from("landmarks")
+          .select("*")
+          .eq("is_active", true)
+          .order("name"),
         supabase!.from("users").select("id, display_name").eq("role", "fom"),
         supabase!
           .from("users")
@@ -82,6 +90,9 @@ export default function FOMOrdersPage() {
 
       if (merchantsData) {
         setMerchantOptions(merchantsData.map((m: any) => m.name));
+      }
+      if (landmarkData) {
+        setLandmarks(landmarkData);
       }
       setOrders((ordersData ?? []) as Order[]);
       setFoms((fomUserData ?? []) as any[]);
@@ -116,8 +127,17 @@ export default function FOMOrdersPage() {
 
   const handleSave = async () => {
     if (!editForm || !supabase) return;
+
+    const selectedLandmark = landmarks.find(
+      (l) => l.name === editForm.landmark,
+    );
+    const landmarkPrice = selectedLandmark ? Number(selectedLandmark.price) : 0;
+    const paymentToMerchant =
+      Number((editForm.amount_paid as any) || 0) - landmarkPrice;
+
     setIsSaving(true);
     setError(null);
+
     try {
       const { error: updateError } = await supabase!
         .from("orders")
@@ -128,6 +148,7 @@ export default function FOMOrdersPage() {
           quantity_delivered: editForm.quantity_delivered,
           amount_paid: editForm.amount_paid,
           fom_comment: editForm.fom_comment,
+          payment_to_merchant: paymentToMerchant,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editForm.id);
@@ -490,19 +511,10 @@ export default function FOMOrdersPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => handleExport(foms, ccUsers, "csv")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleExport(foms, ccUsers, "xlsx")}
-            disabled={loading || orders.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export Spreadsheet
-          </Button>
+          <ExportButton 
+            disabled={loading || orders.length === 0} 
+            onExport={async (start, end, type) => await handleExport(foms, ccUsers, type, start, end)} 
+          />
         </div>
       </div>
 

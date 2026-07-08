@@ -296,6 +296,12 @@ export default function InvoicesPage() {
           `${verifications[String(row.id)]?.confirmed === "true" ? "Confirmed" : "Not Confirmed"} ${verifications[String(row.id)]?.bank || ""}`,
       },
       {
+        key: "fom_comment",
+        label: "FOM Comment",
+        render: (row) => (row.fom_comment as any) || "—",
+        getSearchableText: (row) => (row.fom_comment as any) || "",
+      },
+      {
         key: "action",
         label: "Action",
         render: (row) => (

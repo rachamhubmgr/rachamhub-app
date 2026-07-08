@@ -17,6 +17,19 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 
+const AI_KEYS = [
+  { id: "DEFAULT", label: "Extract with AI 1" },
+  { id: "I", label: "Extract with AI 2" },
+  { id: "II", label: "Extract with AI 3" },
+  { id: "III", label: "Extract with AI 4" },
+  { id: "IV", label: "Extract with AI 5" },
+  { id: "V", label: "Extract with AI 6" },
+  { id: "VI", label: "Extract with AI 7" },
+  { id: "VII", label: "Extract with AI 8" },
+  { id: "VIII", label: "Extract with AI 9" },
+  { id: "IX", label: "Extract with AI 10" },
+];
+
 export default function OrderExtractionForm() {
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +39,7 @@ export default function OrderExtractionForm() {
   const [success, setSuccess] = useState(false);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [orderPrefix, setOrderPrefix] = useState("RCH-");
+  const [extractingKeyId, setExtractingKeyId] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -60,15 +74,17 @@ export default function OrderExtractionForm() {
     fetchConfig();
   }, []);
 
-  const extractOrderFromText = async () => {
+  const extractOrderFromText = async (keyId: string) => {
     setError(null);
     setIsLoading(true);
+    setExtractingKeyId(keyId);
 
     try {
       // Validate input
       if (!text.trim()) {
         setError("Please enter order text to extract");
         setIsLoading(false);
+        setExtractingKeyId(null);
         return;
       }
 
@@ -76,7 +92,7 @@ export default function OrderExtractionForm() {
       const response = await fetch("/api/gemini/extract-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({ text: text.trim(), apiKeyId: keyId }),
       });
 
       if (!response.ok) {
@@ -100,6 +116,7 @@ export default function OrderExtractionForm() {
       console.error("[Order Extraction] Error:", err);
     } finally {
       setIsLoading(false);
+      setExtractingKeyId(null);
     }
   };
 
@@ -191,24 +208,28 @@ export default function OrderExtractionForm() {
             />
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={extractOrderFromText}
-              disabled={isLoading || !text.trim()}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Extracting...
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Extract with AI
-                </>
-              )}
-            </Button>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            {AI_KEYS.map((key) => (
+              <Button
+                key={key.id}
+                onClick={() => extractOrderFromText(key.id)}
+                disabled={isLoading || !text.trim()}
+                variant="outline"
+                className="bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
+              >
+                {isLoading && extractingKeyId === key.id ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    {key.label}
+                  </>
+                )}
+              </Button>
+            ))}
           </div>
         </div>
       </Card>
