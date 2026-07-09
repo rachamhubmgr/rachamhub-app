@@ -17,18 +17,20 @@ export function formatDateDisplay(input: Date) {
 
 const getOrders = async (startDate?: Date, endDate?: Date) => {
   let query = supabase!.from("orders").select("*");
-  
+
   if (startDate) {
     query = query.gte("created_at", startDate.toISOString());
   }
-  
+
   if (endDate) {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
     query = query.lte("created_at", end.toISOString());
   }
 
-  const { data, error: fetchError } = await query.order("created_at", { ascending: false });
+  const { data, error: fetchError } = await query.order("created_at", {
+    ascending: false,
+  });
 
   return { data, fetchError };
 };
@@ -128,7 +130,7 @@ export const handleExport = async (
   ccUsers: any[] = [],
   type: "csv" | "xlsx" = "csv",
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
 ) => {
   const { data: orders } = await getOrders(startDate, endDate);
   if (type === "xlsx") {
@@ -153,4 +155,65 @@ export const handleExport = async (
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+
+export const printTicket = (order: Order) => {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+
+  const itemsHtml =
+    order.items
+      ?.map(
+        (item) => `
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+    </tr>
+  `,
+      )
+      .join("") || "";
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Order Ticket - ${order.id.split("-")[0]}</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; line-height: 1.5; color: #333; }
+          .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: auto; }
+          h1 { text-align: center; margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #000; padding-bottom: 10px; }
+          .call { text-align: center; font-size: 1.1rem; margin: 10px 0; font-style: italic; color: #555; }
+          .field { margin-bottom: 10px; font-size: 1rem; }
+          .label { font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          th { border-bottom: 2px solid #000; text-align: left; padding: 8px; }
+          .total { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <h1>RACHAMHUB LIMITED TICKET</h1>
+          <h2 class="call">* Call before going *</h2>
+          <div class="field"><span class="label">Customer:</span> ${order.customer_name}</div>
+          <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
+          <div class="field"><span class="label">Address:</span> ${order.delivery_address}</div>
+          <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
+          
+          <table>
+            <thead>
+              <tr><th>Product Name</th><th style="text-align:center">Qty</th></tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          
+          <div class="total">Total Amount: ₦${Number(order.total_amount).toLocaleString()}</div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 };

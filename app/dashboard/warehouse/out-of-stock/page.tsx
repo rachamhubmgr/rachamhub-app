@@ -4,21 +4,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
-import { Check, Download, Edit2, Loader2, X } from "lucide-react";
+import { Check, Edit2, Loader2, X } from "lucide-react";
 import { Order } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { cn, handleExport } from "@/lib/utils";
+import { cn, handleExport, printTicket } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-purple-100 text-purple-900",
@@ -29,7 +31,7 @@ const STATUS_STYLES: Record<string, string> = {
   returned: "bg-orange-100 text-orange-900",
 };
 
-export default function InventoryPage() {
+export default function OutOfStockPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,30 +93,15 @@ export default function InventoryPage() {
         getSearchableText: (row) => (row.customer_name as any) || "",
       },
       {
-        key: "delivery_address",
-        label: "Delivery Address",
-        longText: true,
-        render: (row) => (row.delivery_address as any) || "—",
-        getSearchableText: (row) => (row.delivery_address as any) || "",
-      },
-      {
-        key: "phone_numbers",
-        label: "Phone",
-        render: (row) =>
-          ((row.phone_numbers as string[]) || []).join(", ") || "—",
-        getSearchableText: (row) =>
-          ((row.phone_numbers as string[]) || []).join(", "),
-      },
-      {
         key: "items",
         label: "Items",
         longText: true,
         render: (row) =>
           ((row.items as any[]) || [])
             .map((item: any) => `${item.quantity}x ${item.name}`)
-            .join(", "), // Display
+            .join(", "),
         getSearchableText: (row) =>
-          ((row.items as any[]) || []).map((item: any) => item.name).join(", "), // Searchable text
+          ((row.items as any[]) || []).map((item: any) => item.name).join(", "),
       },
       {
         key: "merchant",
@@ -123,53 +110,57 @@ export default function InventoryPage() {
         getSearchableText: (row) => (row.merchant as any) || "",
       },
       {
-        key: "inventory_status",
-        label: "Inventory Del. Status",
+        key: "warehouse_status",
+        label: "Warehouse Status",
         render: (row) =>
           editingId === String(row.id) ? (
             <select
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
-              value={(editForm as any)?.inventory_status || ""}
+              value={(editForm as any)?.warehouse_status || "unpacked"}
               onChange={(e) =>
                 setEditForm((prev) =>
-                  prev ? { ...prev, inventory_status: e.target.value } : prev,
+                  prev ? { ...prev, warehouse_status: e.target.value } : prev,
                 )
               }
             >
-              <option value="">Select status</option>
-              <option value="pending">Pending</option>
-              <option value="shipped">Shipped</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="shelved">Shelved</option>
-              <option value="returned">Returned</option>
+              <option value="out-of-stock">Out of Stock</option>
+              <option value="unpacked">Unpacked</option>
+              <option value="packed">Packed</option>
             </select>
           ) : (
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-medium uppercase whitespace-nowrap",
-                STATUS_STYLES[(row.inventory_status as any) || "pending"],
-              )}
-            >
-              {(row.inventory_status as any) || "pending"}
-            </span>
+            (row as any).warehouse_status || "unpacked"
           ),
-        getSearchableText: (row) => (row.inventory_status as any) || "pending",
-      },
-      {
-        key: "warehouse_status",
-        label: "Warehouse Status",
-        render: (row) => (row as any).warehouse_status || "unpacked",
         getSearchableText: (row) => (row as any).warehouse_status || "unpacked",
       },
       {
         key: "fom_assigned",
         label: "FOM Assigned",
         render: (row) =>
-          fomUsers.find((user) => user.id === (row as any).fom_assigned)
-            ?.display_name || "—",
+          editingId === String(row.id) ? (
+            <select
+              value={(editForm as any)?.fom_assigned || ""}
+              onChange={(e) =>
+                setEditForm((prev) =>
+                  prev
+                    ? { ...prev, fom_assigned: e.target.value as any }
+                    : null,
+                )
+              }
+              className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px]"
+            >
+              <option value="">Unassigned</option>
+              {fomUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.display_name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            fomUsers.find((u) => u.id === (row as any).fom_assigned)
+              ?.display_name || "—"
+          ),
         getSearchableText: (row) =>
-          fomUsers.find((user) => user.id === (row as any).fom_assigned)
+          fomUsers.find((u) => u.id === (row as any).fom_assigned)
             ?.display_name || "",
       },
       {
@@ -212,7 +203,7 @@ export default function InventoryPage() {
         supabase!
           .from("orders")
           .select("*")
-          .neq("warehouse_status", "out-of-stock")
+          .eq("warehouse_status", "out-of-stock")
           .order("created_at", { ascending: false }),
         supabase!
           .from("merchants")
@@ -248,7 +239,6 @@ export default function InventoryPage() {
       editForm &&
       editForm.id === activeCommentOrderId
     ) {
-      // Update the editForm's warehouse_comment with the tempComment
       setEditForm((prev) =>
         prev ? { ...prev, warehouse_comment: tempComment } : null,
       );
@@ -259,26 +249,43 @@ export default function InventoryPage() {
   const handleSave = useCallback(async () => {
     if (!editForm) return;
 
+    const assignedFom = (editForm as any).fom_assigned;
+    const warehouseStatus =
+      (editForm as any).warehouse_status === "out-of-stock";
+    const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
+
     setIsSaving(true);
     setError(null);
+
+    // If warehouse_status is updated to packed or unpacked,
+    if (warehouseStatus) {
+      toast.error("Please select a product warehouse status before saving.");
+      return;
+    }
+    if (!validFomId) {
+      toast.error("Please assign an FOM before saving.");
+      return;
+    }
 
     try {
       const { error: updateError } = await supabase!
         .from("orders")
         .update({
           status: "warehouse",
-          inventory_status: editForm.inventory_status?.toLowerCase(),
-          warehouse_status: (editForm as any).warehouse_status?.toLowerCase(),
-          fom_assigned: (editForm as any).fom_assigned,
-          warehouse_comment: (editForm as any).warehouse_comment,
+          warehouse_status: editForm.warehouse_status?.toLowerCase(),
+          warehouse_comment: editForm.warehouse_comment,
+          fom_assigned: validFomId,
+          fom_assigned_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", editForm.id);
 
       if (updateError) throw updateError;
 
+      const updatedOrder = { ...editForm };
       setEditingId(null);
       setEditForm(null);
+      printTicket(updatedOrder as Order);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
     } finally {
@@ -286,17 +293,17 @@ export default function InventoryPage() {
     }
   }, [editForm]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
-
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
   const actionableOrders = useMemo(
     () =>
       orders.filter(
         (order) =>
-          order.status !== "customer_service" && order.fom_assigned !== null,
+          order.status !== "customer_service" && order.fom_assigned === null,
       ),
     [orders],
   );
@@ -320,6 +327,9 @@ export default function InventoryPage() {
     (row: any) => {
       const orderId = String(row.id);
       const isEditing = editingId === orderId;
+      const isSubmitDisabled =
+        (editForm as any)?.warehouse_status !== "out-of-stock" &&
+        (editForm as any)?.fom_assigned !== "";
       return (
         <div className="flex justify-end gap-1">
           {isEditing ? (
@@ -328,7 +338,7 @@ export default function InventoryPage() {
                 size="icon-sm"
                 variant="ghost"
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || !isSubmitDisabled}
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -367,10 +377,11 @@ export default function InventoryPage() {
       <div className="flex flex-row items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">
-            Inventory Management
+            Out of Stock Orders
           </h1>
           <p className="text-muted-foreground mt-2">
-            Track stock levels and manage items across orders.
+            Manage orders that are currently out of stock. Update status when
+            items become available.
           </p>{" "}
           <div className="flex flex-wrap gap-2 mt-4">
             <ExportButton
@@ -384,17 +395,9 @@ export default function InventoryPage() {
       </div>
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-foreground">Stock summary</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          This view aggregates order item quantities so warehouse staff can
-          prioritize packing.
-        </p>
-      </Card>
-
-      <Card className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-foreground">
-            Order Inventory Management
+            Out of Stock Queue
           </h2>
           <div className="text-sm text-muted-foreground">
             {actionableOrders.length} orders total
@@ -417,6 +420,9 @@ export default function InventoryPage() {
       <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
         <DialogContent className="sm:max-w-131.25">
           <DialogHeader>
+            <DialogDescription className="hidden">
+              Edit Warehouse Comment
+            </DialogDescription>
             <DialogTitle>Edit Warehouse Comment</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">

@@ -5,7 +5,7 @@ import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, printTicket } from "@/lib/utils";
 import { Order } from "@/lib/types";
 import { Check, Edit2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import DataTable, { type DataTableColumn } from "@/components/data-table";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -35,67 +36,6 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-slate-100 text-slate-900",
   shelved: "bg-amber-100 text-amber-900",
   returned: "bg-orange-100 text-orange-900",
-};
-
-const printTicket = (order: Order) => {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return;
-
-  const itemsHtml =
-    order.items
-      ?.map(
-        (item) => `
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-    </tr>
-  `,
-      )
-      .join("") || "";
-
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Order Ticket - ${order.id.split("-")[0]}</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; line-height: 1.5; color: #333; }
-          .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: auto; }
-          h1 { text-align: center; margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .call { text-align: center; font-size: 1.1rem; margin: 10px 0; font-style: italic; color: #555; }
-          .field { margin-bottom: 10px; font-size: 1rem; }
-          .label { font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th { border-bottom: 2px solid #000; text-align: left; padding: 8px; }
-          .total { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
-        </style>
-      </head>
-      <body>
-        <div class="ticket">
-          <h1>RACHAMHUB LIMITED TICKET</h1>
-          <h2 class="call">* Call before going *</h2>
-          <div class="field"><span class="label">Customer:</span> ${order.customer_name}</div>
-          <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
-          <div class="field"><span class="label">Address:</span> ${order.delivery_address}</div>
-          <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
-          
-          <table>
-            <thead>
-              <tr><th>Product Name</th><th style="text-align:center">Qty</th></tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-          
-          <div class="total">Total Amount: ₦${Number(order.total_amount).toLocaleString()}</div>
-        </div>
-        <script>
-          window.onload = function() { window.print(); window.close(); }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
 };
 
 export default function WarehouseOrdersPage() {
@@ -130,6 +70,7 @@ export default function WarehouseOrdersPage() {
         supabase!
           .from("orders")
           .select("*")
+          .neq("warehouse_status", "out-of-stock")
           .order("created_at", { ascending: false }),
         supabase!
           .from("users")
@@ -308,15 +249,19 @@ export default function WarehouseOrdersPage() {
                     ? {
                         ...prev,
                         warehouse_status: e.target.value as any,
+                        fom_assigned:
+                          e.target.value === "out-of-stock"
+                            ? ""
+                            : prev?.fom_assigned,
                       }
                     : null,
                 )
               }
               className="h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-[11px]"
             >
-              <option value="Unpacked">Unpacked</option>
-              <option value="Packed">Packed</option>
-              <option value="out of stock">out of stock</option>
+              <option value="unpacked">Unpacked</option>
+              <option value="packed">Packed</option>
+              <option value="out-of-stock">out of stock</option>
             </select>
           ) : (
             (row as any).warehouse_status || "Unpacked"
@@ -330,6 +275,7 @@ export default function WarehouseOrdersPage() {
           editingId === String(row.id) ? (
             <select
               value={(editForm as any)?.fom_assigned || ""}
+              disabled={(editForm as any)?.warehouse_status === "out-of-stock"}
               onChange={(e) =>
                 setEditForm((prev) =>
                   prev
@@ -398,17 +344,18 @@ export default function WarehouseOrdersPage() {
     if (!editForm || !supabase) return;
 
     const assignedFom = (editForm as any).fom_assigned;
-    const inventoryStatus = (editForm as any).warehouse_status;
+    const warehouseStatus = (editForm as any).warehouse_status;
     const validFomId = fomUsers.find((u) => u.id === assignedFom)?.id || null;
 
-    if (!inventoryStatus) {
-      toast.error("Please select an inventory status before saving.");
-      return;
-    }
-
-    if (!validFomId) {
-      toast.error("Please assign an FOM before saving.");
-      return;
+    if (warehouseStatus !== "out-of-stock") {
+      if (!warehouseStatus) {
+        toast.error("Please select a product warehouse status before saving.");
+        return;
+      }
+      if (!validFomId) {
+        toast.error("Please assign an FOM before saving.");
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -417,28 +364,37 @@ export default function WarehouseOrdersPage() {
     try {
       const { error: updateError } = await supabase!
         .from("orders")
-        .update({
-          status: "warehouse",
-          inventory_status: editForm.inventory_status?.toLowerCase(),
-          warehouse_status: inventoryStatus.toLowerCase(),
-          fom_assigned: validFomId,
-          warehouse_comment: (editForm as any).warehouse_comment,
-          fom_assigned_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .update(
+          warehouseStatus === "out-of-stock"
+            ? {
+                status: "warehouse",
+                inventory_status: editForm.inventory_status?.toLowerCase(),
+                warehouse_status: warehouseStatus.toLowerCase(),
+                warehouse_comment: (editForm as any).warehouse_comment,
+                updated_at: new Date().toISOString(),
+              }
+            : {
+                status: "warehouse",
+                inventory_status: editForm.inventory_status?.toLowerCase(),
+                warehouse_status: warehouseStatus.toLowerCase(),
+                warehouse_comment: (editForm as any).warehouse_comment,
+                fom_assigned: validFomId,
+                fom_assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+        )
         .eq("id", editForm.id);
 
       if (updateError) {
         throw updateError;
       }
-
       const updatedOrder = { ...editForm };
       setEditingId(null);
       setEditForm(null);
-
-      printTicket(updatedOrder as Order);
+      warehouseStatus !== "out-of-stock" && printTicket(updatedOrder as Order);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
+      console.error(err as any);
     } finally {
       setIsSaving(false);
     }
@@ -455,9 +411,11 @@ export default function WarehouseOrdersPage() {
 
   const canSaveWarehouseUpdate = useMemo(() => {
     if (!editForm) return false;
-    const inventoryStatus = (editForm as any).warehouse_status;
+    const warehouseStatus = (editForm as any).warehouse_status;
     const assignedFom = (editForm as any).fom_assigned;
-    return Boolean(inventoryStatus && assignedFom);
+    return Boolean(
+      (warehouseStatus && assignedFom) || warehouseStatus === "out-of-stock",
+    );
   }, [editForm]);
 
   const filteredActionableOrders = useMemo(() => {
@@ -587,6 +545,9 @@ export default function WarehouseOrdersPage() {
       <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
         <DialogContent className="sm:max-w-131.25">
           <DialogHeader>
+            <DialogDescription className="text-sm text-muted-foreground hidden">
+              Edit the warehouse comment for this order.
+            </DialogDescription>
             <DialogTitle>Edit Warehouse Comment</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">

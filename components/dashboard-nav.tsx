@@ -89,15 +89,15 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/`,
           icon: Store,
         },
-        // {
-        //   label: "Orders",
-        //   href: `/dashboard/${user.role}/orders`,
-        //   icon: Package,
-        // },
         {
           label: "Inventory",
           href: `/dashboard/${user.role}/inventory`,
           icon: Warehouse,
+        },
+        {
+          label: "Out-of-Stock",
+          href: `/dashboard/${user.role}/out-of-stock`,
+          icon: Package,
         },
       ],
       fom: [
