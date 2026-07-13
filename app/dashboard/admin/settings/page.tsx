@@ -20,12 +20,22 @@ import {
   Check,
   X,
   Trash2 as DeleteIcon,
+  ChevronDown,
+  ChevronRight,
+  Package,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [merchants, setMerchants] = useState<any[]>([]);
   const [riders, setRiders] = useState<any[]>([]);
   const [landmarks, setLandmarks] = useState<any[]>([]);
+  const [products, setProducts] = useState<Record<string, any[]>>({});
+  const [expandedMerchant, setExpandedMerchant] = useState<string | null>(null);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editProductName, setEditProductName] = useState("");
+  const [editProductPrice, setEditProductPrice] = useState("");
   const [newMerchant, setNewMerchant] = useState("");
   const [newRider, setNewRider] = useState("");
   const [newRiderPhone, setNewRiderPhone] = useState("");
@@ -89,6 +99,74 @@ export default function AdminSettingsPage() {
       .select("*")
       .order("name");
     if (data) setMerchants(data);
+  };
+
+  const fetchProducts = async (merchantId: string) => {
+    const { data } = await supabase!
+      .from("products")
+      .select("*")
+      .eq("merchant_id", merchantId)
+      .order("name");
+    if (data) {
+      setProducts((prev) => ({ ...prev, [merchantId]: data }));
+    }
+  };
+
+  const handleToggleMerchant = (merchantId: string) => {
+    if (expandedMerchant === merchantId) {
+      setExpandedMerchant(null);
+    } else {
+      setExpandedMerchant(merchantId);
+      fetchProducts(merchantId);
+    }
+  };
+
+  const handleAddProduct = async (merchantId: string) => {
+    if (!newProductName || !newProductPrice) {
+      toast.error("Product name and price are required");
+      return;
+    }
+    const { error } = await supabase!.from("products").insert([
+      {
+        merchant_id: merchantId,
+        name: newProductName,
+        price: Number(newProductPrice),
+      },
+    ]);
+    if (error) toast.error("Failed to add product");
+    else {
+      toast.success("Product added");
+      setNewProductName("");
+      setNewProductPrice("");
+      fetchProducts(merchantId);
+    }
+  };
+
+  const handleUpdateProduct = async (productId: string, merchantId: string) => {
+    if (!editProductName || !editProductPrice) return;
+    const { error } = await supabase!
+      .from("products")
+      .update({ name: editProductName, price: Number(editProductPrice) })
+      .eq("id", productId);
+    if (error) toast.error("Failed to update product");
+    else {
+      toast.success("Product updated");
+      setEditingProductId(null);
+      fetchProducts(merchantId);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string, merchantId: string) => {
+    if (!confirm("Delete this product?")) return;
+    const { error } = await supabase!
+      .from("products")
+      .delete()
+      .eq("id", productId);
+    if (error) toast.error("Failed to delete product");
+    else {
+      toast.success("Product deleted");
+      fetchProducts(merchantId);
+    }
   };
 
   const fetchRiders = async () => {
@@ -287,11 +365,8 @@ export default function AdminSettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="merchants" className="w-full">
+      <Tabs defaultValue="riders" className="w-full">
         <TabsList className="bg-muted/50 p-1 mb-6">
-          <TabsTrigger value="merchants" className="gap-2">
-            <Building2 className="h-4 w-4" /> Merchants
-          </TabsTrigger>
           <TabsTrigger value="riders" className="gap-2">
             <Truck className="h-4 w-4" /> Riders
           </TabsTrigger>
@@ -302,106 +377,6 @@ export default function AdminSettingsPage() {
             <Settings2 className="h-4 w-4" /> System Config
           </TabsTrigger> */}
         </TabsList>
-
-        {/* Merchant Management */}
-        <TabsContent value="merchants" className="space-y-6">
-          <OrderSearchFilter
-            searchTerm={merchantSearch}
-            onSearchTermChange={setMerchantSearch}
-            placeholder="Filter merchants by name..."
-            title="Find Merchant"
-          />
-          <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-border">
-            <Input
-              placeholder="Enter merchant name..."
-              value={newMerchant}
-              onChange={(e) => setNewMerchant(e.target.value)}
-              className="max-w-md"
-            />
-            <Button onClick={handleAddMerchant} className="gap-2">
-              <Plus className="h-4 w-4" /> Add Merchant
-            </Button>
-          </div>
-
-          <div className="grid gap-3">
-            {filteredMerchants.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between p-4 border rounded-xl bg-white hover:bg-muted/5 transition-colors"
-              >
-                <div className="flex-1">
-                  {editingMerchantId === m.id ? (
-                    <Input
-                      value={editMerchantName}
-                      onChange={(e) => setEditMerchantName(e.target.value)}
-                      className="h-8 max-w-xs"
-                    />
-                  ) : (
-                    <p
-                      className={`font-semibold ${!m.is_active ? "text-muted-foreground line-through" : "text-foreground"}`}
-                    >
-                      {m.name}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {editingMerchantId === m.id ? (
-                    <>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => handleUpdateMerchant(m.id)}
-                      >
-                        <Check className="h-4 w-4 text-emerald-500" />
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => setEditingMerchantId(null)}
-                      >
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingMerchantId(m.id);
-                          setEditMerchantName(m.name);
-                        }}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={
-                          m.is_active
-                            ? "text-amber-600 h-8"
-                            : "text-emerald-600 h-8"
-                        }
-                        onClick={() =>
-                          handleDeactivateMerchant(m.id, m.is_active)
-                        }
-                      >
-                        {m.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteMerchant(m.id)}
-                      >
-                        <DeleteIcon className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
 
         {/* Riders Management */}
         <TabsContent value="riders" className="space-y-6">

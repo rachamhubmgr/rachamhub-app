@@ -17,6 +17,11 @@ import {
   TrendingUp,
   Layers,
   Store,
+  BarChart3,
+  ClipboardList,
+  Archive,
+  Bike,
+  AlertTriangle,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/types";
 import { useState } from "react";
@@ -62,11 +67,6 @@ export default function DashboardNav({ className }: DashboardNavProps) {
 
     const roleMenus: Record<string, typeof baseItems> = {
       customer_service: [
-        // {
-        //   label: "Home",
-        //   href: `/dashboard/${user.role}/`,
-        //   icon: Home,
-        // },
         {
           label: "Home",
           href: `/dashboard/${user.role}/`,
@@ -78,26 +78,36 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           icon: Package,
         },
         // {
-        //   label: "Inquiries",
-        //   href: `/dashboard/${user.role}/inquiries`,
-        //   icon: MessageSquare,
+        //   label: "Progress Report",
+        //   href: `/dashboard/${user.role}/progress`,
+        //   icon: BarChart3,
         // },
+        {
+          label: "Merchant Dashboard",
+          href: "/merchant/login",
+          icon: Store,
+        },
       ],
       warehouse: [
         {
           label: "Warehouse",
           href: `/dashboard/${user.role}/`,
-          icon: Store,
+          icon: Warehouse,
         },
         {
           label: "Inventory",
           href: `/dashboard/${user.role}/inventory`,
-          icon: Warehouse,
+          icon: Package,
         },
         {
           label: "Out-of-Stock",
           href: `/dashboard/${user.role}/out-of-stock`,
-          icon: Package,
+          icon: AlertTriangle,
+        },
+        {
+          label: "Merchant Dashboard",
+          href: "/merchant/login",
+          icon: Store,
         },
       ],
       fom: [
@@ -111,6 +121,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/orders`,
           icon: Package,
         },
+        // {
+        //   label: "Rider Payments",
+        //   href: `/dashboard/${user.role}/rider-payments`,
+        //   icon: Bike,
+        // },
       ],
       accounting: [
         {
@@ -128,6 +143,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/payments`,
           icon: DollarSign,
         },
+        {
+          label: "Breakdown",
+          href: `/dashboard/${user.role}/breakdown`,
+          icon: ClipboardList,
+        },
       ],
       admin: [
         {
@@ -140,11 +160,6 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/orders`,
           icon: TrendingUp,
         },
-        // {
-        //   label: "Merchants",
-        //   href: `/dashboard/${user.role}/merchants`,
-        //   icon: Layers,
-        // },
         {
           label: "Users",
           href: `/dashboard/${user.role}/users`,
@@ -154,6 +169,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           label: "Settings",
           href: `/dashboard/${user.role}/settings`,
           icon: Settings,
+        },
+        {
+          label: "Merchant Dashboard",
+          href: "/merchant/login",
+          icon: Store,
         },
       ],
     };

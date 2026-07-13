@@ -93,6 +93,13 @@ export default function OutOfStockPage() {
         getSearchableText: (row) => (row.customer_name as any) || "",
       },
       {
+        key: "delivery_address",
+        label: "Delivery Address",
+        longText: true,
+        render: (row) => (row.delivery_address as any) || "—",
+        getSearchableText: (row) => (row.delivery_address as any) || "",
+      },
+      {
         key: "items",
         label: "Items",
         longText: true,

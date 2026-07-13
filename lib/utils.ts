@@ -187,6 +187,7 @@ export const printTicket = (order: Order) => {
           table { width: 100%; border-collapse: collapse; margin-top: 15px; }
           th { border-bottom: 2px solid #000; text-align: left; padding: 8px; }
           .total { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
+          .comment { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
         </style>
       </head>
       <body>
@@ -197,6 +198,7 @@ export const printTicket = (order: Order) => {
           <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
           <div class="field"><span class="label">Address:</span> ${order.delivery_address}</div>
           <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
+          <div class="field"><span class="label">Merchant:</span> #${order.merchant}</div>
           
           <table>
             <thead>
@@ -208,6 +210,7 @@ export const printTicket = (order: Order) => {
           </table>
           
           <div class="total">Total Amount: ₦${Number(order.total_amount).toLocaleString()}</div>
+          <div class="comment">Comment: ${order.cc_comment || "-"}</div>
         </div>
         <script>
           window.onload = function() { window.print(); window.close(); }

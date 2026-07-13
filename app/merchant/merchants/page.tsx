@@ -1,0 +1,332 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import {
+  Loader2,
+  Store,
+  Plus,
+  Package,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  CheckCircle2
+} from "lucide-react";
+
+export default function MerchantsProductsPage() {
+  const [merchants, setMerchants] = useState<any[]>([]);
+  const [products, setProducts] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [newMerchant, setNewMerchant] = useState("");
+  const [expandedMerchant, setExpandedMerchant] = useState<string | null>(null);
+
+  // Add Product State
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+
+  // Edit Product State
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editProductName, setEditProductName] = useState("");
+  const [editProductPrice, setEditProductPrice] = useState("");
+
+  const role = typeof window !== "undefined" ? localStorage.getItem("merchant_role") : null;
+
+  const fetchMerchants = async () => {
+    setLoading(true);
+    const { data } = await supabase!
+      .from("merchants")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setMerchants(data);
+    setLoading(false);
+  };
+
+  const fetchProducts = async (merchantId: string) => {
+    const { data } = await supabase!
+      .from("products")
+      .select("*")
+      .eq("merchant_id", merchantId)
+      .order("created_at", { ascending: false });
+    if (data) {
+      setProducts((prev) => ({ ...prev, [merchantId]: data }));
+    }
+  };
+
+  useEffect(() => {
+    fetchMerchants();
+  }, []);
+
+  const handleToggleMerchant = (merchantId: string) => {
+    if (expandedMerchant === merchantId) {
+      setExpandedMerchant(null);
+    } else {
+      setExpandedMerchant(merchantId);
+      fetchProducts(merchantId);
+    }
+  };
+
+  const getApprovalFields = () => {
+    return {
+      approval_status: role === "guest" ? "pending" : "pending", // all go to pending until fully approved
+      admin_approved: role === "admin",
+      warehouse_approved: role === "warehouse",
+      submitted_by_role: role,
+    };
+  };
+
+  const handleAddMerchant = async () => {
+    if (!newMerchant) return;
+    const { error } = await supabase!
+      .from("merchants")
+      .insert([{ name: newMerchant, ...getApprovalFields() }]);
+    
+    if (error) toast.error("Failed to add merchant");
+    else {
+      toast.success(
+        role === "guest"
+          ? "Merchant added — awaiting Admin & Warehouse approval"
+          : `Merchant added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`
+      );
+      setNewMerchant("");
+      fetchMerchants();
+    }
+  };
+
+  const handleAddProduct = async (merchantId: string) => {
+    if (!newProductName || !newProductPrice) {
+      toast.error("Product name and price are required");
+      return;
+    }
+    const { error } = await supabase!.from("products").insert([
+      {
+        merchant_id: merchantId,
+        name: newProductName,
+        price: Number(newProductPrice),
+        ...getApprovalFields(),
+      },
+    ]);
+    if (error) toast.error("Failed to add product");
+    else {
+      toast.success(
+        role === "guest"
+          ? "Product added — awaiting Admin & Warehouse approval"
+          : `Product added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`
+      );
+      setNewProductName("");
+      setNewProductPrice("");
+      fetchProducts(merchantId);
+    }
+  };
+
+  const handleUpdateProduct = async (productId: string, merchantId: string) => {
+    if (!editProductName || !editProductPrice) return;
+    const { error } = await supabase!
+      .from("products")
+      .update({ name: editProductName, price: Number(editProductPrice) })
+      .eq("id", productId);
+    if (error) toast.error("Failed to update product");
+    else {
+      toast.success("Product updated");
+      setEditingProductId(null);
+      fetchProducts(merchantId);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string, merchantId: string) => {
+    if (!confirm("Delete this product?")) return;
+    const { error } = await supabase!
+      .from("products")
+      .delete()
+      .eq("id", productId);
+    if (error) toast.error("Failed to delete product");
+    else {
+      toast.success("Product deleted");
+      fetchProducts(merchantId);
+    }
+  };
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    if (status === "approved") {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+          <CheckCircle2 className="h-3 w-3" /> Approved
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+        <Clock className="h-3 w-3" /> Pending
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Merchants & Products</h1>
+          <p className="text-slate-500 mt-1">Manage merchants and their product catalogues.</p>
+        </div>
+      </div>
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Store className="h-5 w-5 text-slate-500" />
+          Add New Merchant
+        </h2>
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Merchant name..."
+            value={newMerchant}
+            onChange={(e) => setNewMerchant(e.target.value)}
+            className="max-w-xs"
+          />
+          <Button onClick={handleAddMerchant} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Merchant
+          </Button>
+        </div>
+      </Card>
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-slate-900">All Merchants</h2>
+        
+        {loading ? (
+          <Card className="p-12 text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          </Card>
+        ) : merchants.length === 0 ? (
+          <Card className="p-12 text-center text-slate-500">
+            No merchants added yet.
+          </Card>
+        ) : (
+          merchants.map((merchant) => (
+            <Card key={merchant.id} className="overflow-hidden">
+              <div 
+                className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                onClick={() => handleToggleMerchant(merchant.id)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Store className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">{merchant.name}</h3>
+                    <div className="mt-1">
+                      <StatusBadge status={merchant.approval_status || "approved"} />
+                    </div>
+                  </div>
+                </div>
+                {expandedMerchant === merchant.id ? (
+                  <ChevronUp className="h-5 w-5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-slate-400" />
+                )}
+              </div>
+
+              {expandedMerchant === merchant.id && (
+                <div className="p-4 border-t border-slate-100 bg-white">
+                  <div className="mb-6 space-y-3">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+                      <Package className="h-4 w-4" /> Add Product to {merchant.name}
+                    </h4>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        placeholder="Product Name"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                        className="max-w-[200px]"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Price (₦)"
+                        value={newProductPrice}
+                        onChange={(e) => setNewProductPrice(e.target.value)}
+                        className="max-w-[120px]"
+                      />
+                      <Button onClick={() => handleAddProduct(merchant.id)} size="sm">
+                        Add Product
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Products Catalogue</h4>
+                    {!products[merchant.id] ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    ) : products[merchant.id].length === 0 ? (
+                      <p className="text-sm text-slate-500 italic">No products added for this merchant.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {products[merchant.id].map((product) => (
+                          <div key={product.id} className="border rounded-xl p-3 bg-slate-50/50">
+                            {editingProductId === product.id ? (
+                              <div className="space-y-2">
+                                <Input
+                                  size={1}
+                                  value={editProductName}
+                                  onChange={(e) => setEditProductName(e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                                <Input
+                                  size={1}
+                                  type="number"
+                                  value={editProductPrice}
+                                  onChange={(e) => setEditProductPrice(e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleUpdateProduct(product.id, merchant.id)}>Save</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingProductId(null)}>Cancel</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-semibold text-sm">{product.name}</p>
+                                  <p className="text-xs text-primary font-mono font-medium">₦{Number(product.price).toLocaleString()}</p>
+                                  <div className="mt-1">
+                                    <StatusBadge status={product.approval_status || "approved"} />
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingProductId(product.id);
+                                      setEditProductName(product.name);
+                                      setEditProductPrice(product.price);
+                                    }}
+                                  >
+                                    <Edit2 className="h-3 w-3 text-slate-500" />
+                                  </Button>
+                                  <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteProduct(product.id, merchant.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-red-500" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
