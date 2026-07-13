@@ -433,7 +433,43 @@ export default function AdminOrdersPage() {
             <div className="py-1 flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[8px] uppercase text-muted-foreground font-bold">
-                  IN:
+                  WH:
+                </span>
+                {isEditing ? (
+                  <select
+                    className="h-6 text-[9px] rounded border px-1"
+                    value={editForm?.warehouse_status || ""}
+                    onChange={(e) =>
+                      setEditForm((p: any) => ({
+                        ...p,
+                        warehouse_status: e.target.value,
+                      }))
+                    }
+                  >
+                    {["unpacked", "packed", "out-of-stock"].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={cn(
+                      "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-sm",
+                      String(row.warehouse_status) === "packed"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : String(row.warehouse_status) === "out-of-stock"
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {String(row.warehouse_status || "unpacked")}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[8px] uppercase text-muted-foreground font-bold">
+                  INV:
                 </span>
                 {isEditing ? (
                   <select
@@ -905,9 +941,11 @@ export default function AdminOrdersPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ExportButton 
-            disabled={loading || orders.length === 0} 
-            onExport={async (start, end, type) => await handleExport(fomUsers, ccUsers, type, start, end)} 
+          <ExportButton
+            disabled={loading || orders.length === 0}
+            onExport={async (start, end, type) =>
+              await handleExport(fomUsers, ccUsers, type, start, end)
+            }
           />
         </div>
       </div>
