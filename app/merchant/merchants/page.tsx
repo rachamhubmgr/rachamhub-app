@@ -18,6 +18,7 @@ import {
   Clock,
   CheckCircle2
 } from "lucide-react";
+import { useMerchantSession } from "@/components/merchant-session-provider";
 
 export default function MerchantsProductsPage() {
   const [merchants, setMerchants] = useState<any[]>([]);
@@ -35,7 +36,7 @@ export default function MerchantsProductsPage() {
   const [editProductName, setEditProductName] = useState("");
   const [editProductPrice, setEditProductPrice] = useState("");
 
-  const role = typeof window !== "undefined" ? localStorage.getItem("merchant_role") : null;
+  const { role } = useMerchantSession();
 
   const fetchMerchants = async () => {
     setLoading(true);

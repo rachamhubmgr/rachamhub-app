@@ -2,6 +2,8 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Order } from "@/lib/types";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import supabase from "./supabase";
 
 export function cn(...inputs: ClassValue[]) {
@@ -158,65 +160,71 @@ export const handleExport = async (
 };
 
 export const printTicket = (order: Order) => {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return;
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a5",
+  });
+  const margin = 14;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const ticketId = order.id.split("-")[0].toUpperCase();
+  let cursorY = 16;
 
-  const itemsHtml =
-    order.items
-      ?.map(
-        (item) => `
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-    </tr>
-  `,
-      )
-      .join("") || "";
+  pdf.setProperties({ title: `Order Ticket - ${ticketId}` });
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(15);
+  pdf.text("RACHAMHUB LIMITED TICKET", pageWidth / 2, cursorY, {
+    align: "center",
+  });
+  cursorY += 8;
+  pdf.setFont("helvetica", "italic");
+  pdf.setFontSize(11);
+  pdf.text("* Call before going *", pageWidth / 2, cursorY, {
+    align: "center",
+  });
+  cursorY += 10;
 
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Order Ticket - ${order.id.split("-")[0]}</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; line-height: 1.5; color: #333; }
-          .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: auto; }
-          h1 { text-align: center; margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .call { text-align: center; font-size: 1.1rem; margin: 10px 0; font-style: italic; color: #555; }
-          .field { margin-bottom: 10px; font-size: 1rem; }
-          .label { font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th { border-bottom: 2px solid #000; text-align: left; padding: 8px; }
-          .total { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
-          .comment { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; font-size: 1.2rem; font-weight: bold; text-align: right; }
-        </style>
-      </head>
-      <body>
-        <div class="ticket">
-          <h1>RACHAMHUB LIMITED TICKET</h1>
-          <h2 class="call">* Call before going *</h2>
-          <div class="field"><span class="label">Customer:</span> ${order.customer_name}</div>
-          <div class="field"><span class="label">Phone:</span> ${order.phone_numbers?.join(", ") || "-"}</div>
-          <div class="field"><span class="label">Address:</span> ${order.delivery_address}</div>
-          <div class="field"><span class="label">Order ID:</span> #${order.id.split("-")[0].toUpperCase()}</div>
-          <div class="field"><span class="label">Merchant:</span> #${order.merchant}</div>
-          
-          <table>
-            <thead>
-              <tr><th>Product Name</th><th style="text-align:center">Qty</th></tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-          
-          <div class="total">Total Amount: ₦${Number(order.total_amount).toLocaleString()}</div>
-          <div class="comment">Comment: ${order.cc_comment || "-"}</div>
-        </div>
-        <script>
-          window.onload = function() { window.print(); window.close(); }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
+  const addField = (label: string, value: string) => {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text(`${label}:`, margin, cursorY);
+    const valueX = margin + pdf.getTextWidth(`${label}: `);
+    const lines = pdf.splitTextToSize(value, pageWidth - margin - valueX);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(lines, valueX, cursorY);
+    cursorY += Math.max(6, lines.length * 5) + 1;
+  };
+
+  addField("Customer", order.customer_name || "-");
+  addField("Phone", order.phone_numbers?.join(", ") || "-");
+  addField("Address", order.delivery_address || "-");
+  addField("Order ID", `#${ticketId}`);
+  addField("Merchant", order.merchant || "-");
+
+  autoTable(pdf, {
+    startY: cursorY + 2,
+    head: [["Product Name", "Qty"]],
+    body: order.items?.map((item) => [item.name, String(item.quantity)]) || [],
+    margin: { left: margin, right: margin },
+    styles: { font: "helvetica", fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [0, 0, 0], textColor: 255 },
+    columnStyles: { 1: { halign: "center", cellWidth: 20 } },
+  });
+  const tableEndY = (pdf as jsPDF & {
+    lastAutoTable: { finalY: number };
+  }).lastAutoTable.finalY;
+  cursorY = tableEndY + 9;
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11);
+  pdf.text(
+    `Total Amount: ₦${Number(order.total_amount || 0).toLocaleString()}`,
+    pageWidth - margin,
+    cursorY,
+    { align: "right" },
+  );
+  cursorY += 9;
+  addField("Comment", order.cc_comment || "-");
+
+  pdf.save(`rachamhub-order-ticket-${ticketId}.pdf`);
 };

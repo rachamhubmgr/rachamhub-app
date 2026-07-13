@@ -16,25 +16,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
+import {
+  MerchantSessionProvider,
+  useMerchantSession,
+} from "@/components/merchant-session-provider";
 
-export default function MerchantLayout({ children }: { children: React.ReactNode }) {
+function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [role, setRole] = useState<string | null>(null);
+  const {
+    role,
+    loading,
+    hasNormalDashboardSession,
+    signOutMerchant,
+  } = useMerchantSession();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const storedRole = localStorage.getItem("merchant_role");
-    if (!storedRole && pathname !== "/merchant/login") {
+    if (
+      !loading &&
+      pathname !== "/merchant/login" &&
+      (!role || !hasNormalDashboardSession)
+    ) {
       router.replace("/merchant/login");
-    } else {
-      setRole(storedRole);
     }
-  }, [pathname, router]);
-
-  if (!mounted) return null;
+  }, [hasNormalDashboardSession, loading, pathname, role, router]);
 
   // Don't show layout for the login page
   if (pathname === "/merchant/login") {
@@ -42,10 +48,10 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
   }
 
   // If no role but not on login page, wait for redirect
-  if (!role) return null;
+  if (loading || !role) return null;
 
-  const handleLogout = () => {
-    localStorage.removeItem("merchant_role");
+  const handleLogout = async () => {
+    await signOutMerchant();
     toast.success("Logged out of Merchant Dashboard");
     router.push("/merchant/login");
   };
@@ -177,5 +183,13 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
         </main>
       </div>
     </div>
+  );
+}
+
+export default function MerchantLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <MerchantSessionProvider>
+      <MerchantLayoutContent>{children}</MerchantLayoutContent>
+    </MerchantSessionProvider>
   );
 }

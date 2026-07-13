@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,48 +9,61 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, ShieldCheck, User } from "lucide-react";
 import Image from "next/image";
+import {
+  createMerchantSession,
+  type MerchantRole,
+} from "@/lib/merchant-session";
+import { useMerchantSession } from "@/components/merchant-session-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function MerchantLoginPage() {
   const router = useRouter();
-  const [role, setRole] = useState<"admin" | "warehouse" | "guest" | null>(
-    null,
-  );
+  const {
+    role: activeRole,
+    loading: sessionLoading,
+    hasNormalDashboardSession,
+    refreshMerchantSession,
+  } = useMerchantSession();
+  const [role, setRole] = useState<MerchantRole | null>(null);
   const [accessKey, setAccessKey] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sessionLoading && activeRole) {
+      router.replace(
+        activeRole === "admin" ? "/merchant/approvals" : "/merchant/stock",
+      );
+    }
+  }, [activeRole, router, sessionLoading]);
 
   const handleLogin = async () => {
     if (!role) return;
 
-    if (role === "guest") {
-      localStorage.setItem("merchant_role", "guest");
-      toast.success("Logged in as Guest");
-      router.push("/merchant/stock");
-      return;
-    }
-
-    if (!accessKey) {
+    if (role !== "guest" && !accessKey) {
       toast.error("Access key is required for this role");
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase!
-        .from("merchant_access_keys")
-        .select("*")
-        .eq("role", role)
-        .eq("access_key", accessKey)
-        .single();
-
-      if (error || !data) {
-        throw new Error("Invalid access key");
-      }
-
-      localStorage.setItem("merchant_role", role);
+      await createMerchantSession(role, accessKey);
+      await refreshMerchantSession();
       toast.success(`Logged in as ${role.toUpperCase()}`);
       router.push(role === "admin" ? "/merchant/approvals" : "/merchant/stock");
-    } catch (err) {
-      toast.error("Invalid access key. Please try again.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to verify merchant access. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -79,32 +91,40 @@ export default function MerchantLoginPage() {
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 w-full flex flex-col justify-center items-center">
         <Card className="py-8 px-4 sm:shadow sm:rounded-lg sm:px-10 border-0 shadow-xl">
           {!role ? (
-            <div className="space-y-4">
+            <div className="flex flex-wrap justify-center gap-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <Button
                 variant="outline"
-                className="w-full h-14 justify-start gap-4 text-lg font-medium"
+                className="size-44 shrink-0 flex-col justify-center gap-4 rounded-2xl border-2 text-lg font-medium shadow-sm transition-all duration-200 hover:-translate-y-1 hover:text-primary/50 hover:border-primary/50 hover:bg-primary/5 hover:shadow-lg active:translate-y-0"
                 onClick={() => setRole("admin")}
               >
-                <ShieldCheck className="h-6 w-6 text-primary" />
+                <ShieldCheck className="size-12 text-primary" />
                 Admin / Manager
               </Button>
               <Button
                 variant="outline"
-                className="w-full h-14 justify-start gap-4 text-lg font-medium"
+                className="size-44 shrink-0 flex-col justify-center gap-4 rounded-2xl border-2 text-lg font-medium shadow-sm transition-all duration-200 hover:-translate-y-1 hover:text-amber-500/50 hover:border-amber-500/50 hover:bg-amber-500/5 hover:shadow-lg active:translate-y-0"
                 onClick={() => setRole("warehouse")}
               >
-                <ShieldCheck className="h-6 w-6 text-amber-600" />
+                <ShieldCheck className="size-12 text-amber-600" />
                 Warehouse Staff
               </Button>
               <Button
                 variant="outline"
-                className="w-full h-14 justify-start gap-4 text-lg font-medium"
+                className="size-44 shrink-0 flex-col justify-center gap-4 rounded-2xl border-2 text-lg font-medium shadow-sm transition-all duration-200 hover:-translate-y-1 hover:text-blue-500/50 hover:border-blue-500/50 hover:bg-blue-500/5 hover:shadow-lg active:translate-y-0"
+                onClick={() => setRole("customer_service")}
+              >
+                <ShieldCheck className="size-12 text-blue-600" />
+                Customer Service
+              </Button>
+              <Button
+                variant="outline"
+                className="size-44 shrink-0 flex-col justify-center gap-4 rounded-2xl border-2 text-lg font-medium shadow-sm transition-all duration-200 hover:-translate-y-1 hover:text-slate-500/50 hover:border-slate-500/50 hover:bg-slate-500/5 hover:shadow-lg active:translate-y-0"
                 onClick={() => setRole("guest")}
               >
-                <User className="h-6 w-6 text-slate-500" />
+                <User className="size-12 text-slate-500" />
                 Guest Access
               </Button>
             </div>
@@ -117,8 +137,8 @@ export default function MerchantLoginPage() {
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {role === "guest"
-                      ? "No access key required."
-                      : "Enter your secondary access key."}
+                      ? "Guest actions are submitted for administrator approval."
+                      : "Enter the access key assigned to your dashboard account."}
                   </p>
                 </div>
                 <Button
@@ -174,6 +194,22 @@ export default function MerchantLoginPage() {
           </Button>
         </div>
       </div>
+      <AlertDialog open={!sessionLoading && !hasNormalDashboardSession}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Main dashboard login required</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sign in to the main RachamHub dashboard first, then return here to
+              enter the merchant access key assigned to your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => router.push("/login")}>
+              Go to main dashboard login
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

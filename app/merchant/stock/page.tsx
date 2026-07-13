@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useMerchantSession } from "@/components/merchant-session-provider";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -30,7 +31,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function MerchantStockPage() {
-  const role = typeof window !== "undefined" ? localStorage.getItem("merchant_role") : null;
+  const { role } = useMerchantSession();
   
   const [merchants, setMerchants] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);

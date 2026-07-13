@@ -6,9 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Check, X, Store, Package, Archive } from "lucide-react";
+import { useMerchantSession } from "@/components/merchant-session-provider";
 
 export default function MerchantApprovalsPage() {
-  const role = typeof window !== "undefined" ? localStorage.getItem("merchant_role") : null;
+  const { role } = useMerchantSession();
   
   const [loading, setLoading] = useState(true);
   const [pendingMerchants, setPendingMerchants] = useState<any[]>([]);

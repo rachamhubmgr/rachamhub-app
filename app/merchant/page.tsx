@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { useMerchantSession } from "@/components/merchant-session-provider";
 
 export default function MerchantIndex() {
   const router = useRouter();
+  const { role, loading } = useMerchantSession();
 
   useEffect(() => {
-    const role = localStorage.getItem("merchant_role");
+    if (loading) return;
     if (!role) {
       router.replace("/merchant/login");
     } else if (role === "admin") {
@@ -16,7 +18,7 @@ export default function MerchantIndex() {
     } else {
       router.replace("/merchant/stock");
     }
-  }, [router]);
+  }, [loading, role, router]);
 
   return (
     <div className="flex h-screen items-center justify-center">
