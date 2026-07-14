@@ -83,14 +83,14 @@ export default function DashboardNav({ className }: DashboardNavProps) {
         //   icon: BarChart3,
         // },
         {
-          label: "Merchant Dashboard",
-          href: "/merchant/login",
-          icon: Store,
-        },
-        {
           label: "Breakdown",
           href: `/dashboard/${user.role}/breakdown`,
           icon: ClipboardList,
+        },
+        {
+          label: "Merchant Dashboard",
+          href: "/merchant/login",
+          icon: Store,
         },
       ],
       warehouse: [

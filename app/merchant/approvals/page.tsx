@@ -4,14 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Check, X, Store, Package, Archive } from "lucide-react";
 import { useMerchantSession } from "@/components/merchant-session-provider";
 
 export default function MerchantApprovalsPage() {
   const { role } = useMerchantSession();
-  
+
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("merchants");
   const [pendingMerchants, setPendingMerchants] = useState<any[]>([]);
   const [pendingProducts, setPendingProducts] = useState<any[]>([]);
   const [pendingStock, setPendingStock] = useState<any[]>([]);
@@ -72,7 +74,7 @@ export default function MerchantApprovalsPage() {
     if (table === "stock_entries") {
       if (isFullyApproved) {
         updates.status = "approved";
-        updates.approved_by = "system"; // Normally this would be a user ID, but we don't have auth IDs here
+        updates.approved_by = "system";
         updates.approved_at = new Date().toISOString();
       }
     } else {
@@ -84,7 +86,11 @@ export default function MerchantApprovalsPage() {
     try {
       const { error } = await supabase!.from(table).update(updates).eq("id", item.id);
       if (error) throw error;
-      toast.success(isFullyApproved ? "Item fully approved and went live!" : "Your approval was recorded.");
+      toast.success(
+        isFullyApproved
+          ? "Item fully approved and went live!"
+          : "Your approval was recorded.",
+      );
       fetchPendingItems();
     } catch (err) {
       toast.error("Failed to approve item");
@@ -119,17 +125,31 @@ export default function MerchantApprovalsPage() {
     customerService: boolean;
   }) => (
     <div className="flex gap-2 text-[10px] font-semibold uppercase">
-      <span className={`px-2 py-0.5 rounded-full ${admin ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+      <span
+        className={`px-2 py-0.5 rounded-full ${admin ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+      >
         Admin: {admin ? "Yes" : "No"}
       </span>
-      <span className={`px-2 py-0.5 rounded-full ${warehouse ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+      <span
+        className={`px-2 py-0.5 rounded-full ${warehouse ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+      >
         WH: {warehouse ? "Yes" : "No"}
       </span>
-      <span className={`px-2 py-0.5 rounded-full ${customerService ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+      <span
+        className={`px-2 py-0.5 rounded-full ${customerService ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+      >
         CS: {customerService ? "Yes" : "No"}
       </span>
     </div>
   );
+
+  /** Small numeric badge shown on each tab trigger */
+  const CountBadge = ({ count }: { count: number }) =>
+    count === 0 ? null : (
+      <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary leading-none">
+        {count}
+      </span>
+    );
 
   if (role !== "admin" && role !== "warehouse" && role !== "customer_service") {
     return (
@@ -140,11 +160,13 @@ export default function MerchantApprovalsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Pending Approvals</h1>
         <p className="text-slate-500 mt-2">
-          Review and approve changes made by Guests, or co-approve actions from other managers.
+          Review and approve changes made by Guests, or co-approve actions from
+          other managers.
         </p>
       </div>
 
@@ -154,31 +176,69 @@ export default function MerchantApprovalsPage() {
           <p className="mt-4 text-sm text-slate-500">Loading pending items...</p>
         </Card>
       ) : (
-        <>
-          {/* Pending Merchants */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
-              <Store className="h-5 w-5 text-slate-500" /> Pending Merchants ({pendingMerchants.length})
-            </h2>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="merchants" className="gap-1.5">
+              <Store className="h-4 w-4" />
+              Merchants
+              <CountBadge count={pendingMerchants.length} />
+            </TabsTrigger>
+            <TabsTrigger value="products" className="gap-1.5">
+              <Package className="h-4 w-4" />
+              Products
+              <CountBadge count={pendingProducts.length} />
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="gap-1.5">
+              <Archive className="h-4 w-4" />
+              Stock Additions
+              <CountBadge count={pendingStock.length} />
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Merchants tab ── */}
+          <TabsContent value="merchants" className="space-y-4">
             {pendingMerchants.length === 0 ? (
-              <p className="text-sm text-slate-500">No pending merchants.</p>
+              <Card className="p-12 text-center border-0 shadow-sm">
+                <Store className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                <p className="text-slate-500 text-sm">No pending merchants.</p>
+              </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {pendingMerchants.map((merchant) => (
-                  <Card key={merchant.id} className="p-4 flex items-center justify-between border-0 shadow-sm">
+                  <Card
+                    key={merchant.id}
+                    className="p-4 flex items-center justify-between border-0 shadow-sm"
+                  >
                     <div>
                       <p className="font-semibold text-slate-900">{merchant.name}</p>
-                      <p className="text-xs text-slate-400 mt-1">Submitted by: <span className="capitalize">{merchant.submitted_by_role}</span></p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Submitted by:{" "}
+                        <span className="capitalize">{merchant.submitted_by_role}</span>
+                      </p>
                       <div className="mt-2">
-                      <ApprovalBadge admin={merchant.admin_approved} warehouse={merchant.warehouse_approved} customerService={merchant.customer_service_approved} />
+                        <ApprovalBadge
+                          admin={merchant.admin_approved}
+                          warehouse={merchant.warehouse_approved}
+                          customerService={merchant.customer_service_approved}
+                        />
                       </div>
                     </div>
                     {canApprove(merchant) && (
                       <div className="flex gap-2">
-                        <Button size="icon-sm" variant="outline" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove("merchants", merchant)}>
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="text-emerald-600 hover:bg-emerald-50"
+                          onClick={() => handleApprove("merchants", merchant)}
+                        >
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="icon-sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => handleReject("merchants", merchant.id)}>
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => handleReject("merchants", merchant.id)}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -187,67 +247,98 @@ export default function MerchantApprovalsPage() {
                 ))}
               </div>
             )}
-          </section>
+          </TabsContent>
 
-          {/* Pending Products */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
-              <Package className="h-5 w-5 text-slate-500" /> Pending Products ({pendingProducts.length})
-            </h2>
+          {/* ── Products tab ── */}
+          <TabsContent value="products" className="space-y-4">
             {pendingProducts.length === 0 ? (
-              <p className="text-sm text-slate-500">No pending products.</p>
+              <Card className="p-12 text-center border-0 shadow-sm">
+                <Package className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                <p className="text-slate-500 text-sm">No pending products.</p>
+              </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {pendingProducts.map((product) => (
-                  <Card key={product.id} className="p-4 flex flex-col justify-between border-0 shadow-sm">
+                  <Card
+                    key={product.id}
+                    className="p-4 flex flex-col justify-between border-0 shadow-sm"
+                  >
                     <div>
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-semibold text-slate-900">{product.name}</p>
-                          <p className="text-xs text-primary font-mono font-medium">₦{Number(product.price).toLocaleString()}</p>
+                          <p className="text-xs text-primary font-mono font-medium">
+                            ₦{Number(product.price).toLocaleString()}
+                          </p>
                         </div>
                         {canApprove(product) && (
                           <div className="flex gap-1">
-                            <Button size="icon-sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove("products", product)}>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                              onClick={() => handleApprove("products", product)}
+                            >
                               <Check className="h-4 w-4" />
                             </Button>
-                            <Button size="icon-sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => handleReject("products", product.id)}>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleReject("products", product.id)}
+                            >
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">Merchant: {product.merchants?.name}</p>
-                      <p className="text-xs text-slate-400">Submitted by: <span className="capitalize">{product.submitted_by_role}</span></p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Merchant: {product.merchants?.name}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Submitted by:{" "}
+                        <span className="capitalize">{product.submitted_by_role}</span>
+                      </p>
                     </div>
                     <div className="mt-3 pt-3 border-t">
-                      <ApprovalBadge admin={product.admin_approved} warehouse={product.warehouse_approved} customerService={product.customer_service_approved} />
+                      <ApprovalBadge
+                        admin={product.admin_approved}
+                        warehouse={product.warehouse_approved}
+                        customerService={product.customer_service_approved}
+                      />
                     </div>
                   </Card>
                 ))}
               </div>
             )}
-          </section>
+          </TabsContent>
 
-          {/* Pending Stock */}
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
-              <Archive className="h-5 w-5 text-slate-500" /> Pending Stock Additions ({pendingStock.length})
-            </h2>
+          {/* ── Stock Additions tab ── */}
+          <TabsContent value="stock" className="space-y-3">
             {pendingStock.length === 0 ? (
-              <p className="text-sm text-slate-500">No pending stock entries.</p>
+              <Card className="p-12 text-center border-0 shadow-sm">
+                <Archive className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                <p className="text-slate-500 text-sm">No pending stock entries.</p>
+              </Card>
             ) : (
               <div className="space-y-3">
                 {pendingStock.map((entry) => (
-                  <Card key={entry.id} className="p-4 flex items-center justify-between border-0 shadow-sm">
+                  <Card
+                    key={entry.id}
+                    className="p-4 flex items-center justify-between border-0 shadow-sm"
+                  >
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <p className="text-xs text-slate-500">Merchant</p>
-                        <p className="text-sm font-semibold text-slate-900">{entry.merchants?.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {entry.merchants?.name}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Product</p>
-                        <p className="text-sm font-semibold text-slate-900">{entry.products?.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {entry.products?.name}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Quantity</p>
@@ -255,17 +346,33 @@ export default function MerchantApprovalsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Submitted By</p>
-                        <p className="text-sm font-semibold text-slate-700 capitalize">{entry.submitted_by_role}</p>
+                        <p className="text-sm font-semibold text-slate-700 capitalize">
+                          {entry.submitted_by_role}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 ml-4">
-                      <ApprovalBadge admin={entry.admin_approved} warehouse={entry.warehouse_approved} customerService={entry.customer_service_approved} />
+                      <ApprovalBadge
+                        admin={entry.admin_approved}
+                        warehouse={entry.warehouse_approved}
+                        customerService={entry.customer_service_approved}
+                      />
                       {canApprove(entry) && (
                         <div className="flex gap-2 pl-4 border-l">
-                          <Button size="icon-sm" variant="outline" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove("stock_entries", entry)}>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            className="text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => handleApprove("stock_entries", entry)}
+                          >
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button size="icon-sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => handleReject("stock_entries", entry.id)}>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleReject("stock_entries", entry.id)}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -275,8 +382,8 @@ export default function MerchantApprovalsPage() {
                 ))}
               </div>
             )}
-          </section>
-        </>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
