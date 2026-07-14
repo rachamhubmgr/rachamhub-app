@@ -19,7 +19,8 @@ export default function MerchantUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [accessRows, setAccessRows] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedRole, setSelectedRole] = useState<(typeof merchantRoles)[number]>("warehouse");
+  const [selectedRole, setSelectedRole] =
+    useState<(typeof merchantRoles)[number]>("warehouse");
   const [accessKey, setAccessKey] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState("");
@@ -56,9 +57,7 @@ export default function MerchantUsersPage() {
   }, [fetchData]);
 
   const availableUsers = useMemo(() => {
-    const granted = new Set(
-      accessRows.map((row) => `${row.id}:${row.role}`),
-    );
+    const granted = new Set(accessRows.map((row) => `${row.id}:${row.role}`));
     return users.filter((user) => !granted.has(`${user.id}:${selectedRole}`));
   }, [accessRows, selectedRole, users]);
 
@@ -70,14 +69,20 @@ export default function MerchantUsersPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase!.from("merchant_access_keys").upsert(
-        {
-          id: selectedUserId,
-          role: selectedRole,
-          access_key: accessKey.trim(),
-        },
-        { onConflict: "id,role" },
-      );
+      console.log({
+        id: selectedUserId,
+        role: selectedRole,
+        access_key: accessKey.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      const { error } = await supabase!.from("merchant_access_keys").insert({
+        id: selectedUserId,
+        role: selectedRole,
+        access_key: accessKey.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
 
       if (error) throw error;
       toast.success("Merchant dashboard access granted.");
@@ -212,16 +217,26 @@ export default function MerchantUsersPage() {
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
           </div>
         ) : accessRows.length === 0 ? (
-          <p className="text-sm text-slate-500">No merchant access users yet.</p>
+          <p className="text-sm text-slate-500">
+            No merchant access users yet.
+          </p>
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="p-3 text-left text-xs font-semibold text-slate-500">User</th>
-                  <th className="p-3 text-left text-xs font-semibold text-slate-500">Role</th>
-                  <th className="p-3 text-left text-xs font-semibold text-slate-500">Access Key</th>
-                  <th className="p-3 text-right text-xs font-semibold text-slate-500">Actions</th>
+                  <th className="p-3 text-left text-xs font-semibold text-slate-500">
+                    User
+                  </th>
+                  <th className="p-3 text-left text-xs font-semibold text-slate-500">
+                    Role
+                  </th>
+                  <th className="p-3 text-left text-xs font-semibold text-slate-500">
+                    Access Key
+                  </th>
+                  <th className="p-3 text-right text-xs font-semibold text-slate-500">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -231,28 +246,50 @@ export default function MerchantUsersPage() {
                   return (
                     <tr key={editKey} className="border-t">
                       <td className="p-3">
-                        <p className="font-medium">{row.users?.display_name || row.users?.email || row.id}</p>
-                        <p className="text-xs text-slate-500">{row.users?.email}</p>
+                        <p className="font-medium">
+                          {row.users?.display_name ||
+                            row.users?.email ||
+                            row.id}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {row.users?.email}
+                        </p>
                       </td>
-                      <td className="p-3 capitalize">{row.role.replace("_", " ")}</td>
+                      <td className="p-3 capitalize">
+                        {row.role.replace("_", " ")}
+                      </td>
                       <td className="p-3">
                         {isEditing ? (
                           <Input
                             value={editingKey}
-                            onChange={(event) => setEditingKey(event.target.value)}
+                            onChange={(event) =>
+                              setEditingKey(event.target.value)
+                            }
                           />
                         ) : (
-                          <span className="font-mono text-xs">{row.access_key}</span>
+                          <span className="font-mono text-xs">
+                            {row.access_key}
+                          </span>
                         )}
                       </td>
                       <td className="p-3">
                         <div className="flex justify-end gap-2">
                           {isEditing ? (
                             <>
-                              <Button size="icon-sm" variant="ghost" onClick={() => updateAccessKey(row)} disabled={saving}>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => updateAccessKey(row)}
+                                disabled={saving}
+                              >
                                 <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
-                              <Button size="icon-sm" variant="ghost" onClick={() => setEditingId(null)} disabled={saving}>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => setEditingId(null)}
+                                disabled={saving}
+                              >
                                 <X className="h-4 w-4 text-red-600" />
                               </Button>
                             </>
@@ -268,7 +305,12 @@ export default function MerchantUsersPage() {
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button size="icon-sm" variant="ghost" onClick={() => deleteAccess(row)} disabled={saving}>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => deleteAccess(row)}
+                                disabled={saving}
+                              >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             </>

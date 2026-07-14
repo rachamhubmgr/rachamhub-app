@@ -203,9 +203,33 @@ export default function InventoryPage() {
       {
         key: "fom_assigned",
         label: "FOM Assigned",
-        render: (row) =>
-          fomUsers.find((user) => user.id === (row as any).fom_assigned)
-            ?.display_name || "—",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+
+          if (!isEditing)
+            return (
+              fomUsers.find((user) => user.id === (row as any).fom_assigned)
+                ?.display_name || "—"
+            );
+
+          return (
+            <select
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
+              value={(editForm as any)?.fom_assigned || "—"}
+              onChange={(event) =>
+                setEditForm((prev) =>
+                  prev ? { ...prev, fom_assigned: event.target.value } : prev,
+                )
+              }
+            >
+              {fomUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.display_name}
+                </option>
+              ))}
+            </select>
+          );
+        },
         getSearchableText: (row) =>
           fomUsers.find((user) => user.id === (row as any).fom_assigned)
             ?.display_name || "",
@@ -363,12 +387,7 @@ export default function InventoryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [
-    editForm,
-    orders,
-    verifyWarehouseAccessKey,
-    warehouseKeyModalOpen,
-  ]);
+  }, [editForm, orders, verifyWarehouseAccessKey, warehouseKeyModalOpen]);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
@@ -523,7 +542,10 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={warehouseKeyModalOpen} onOpenChange={setWarehouseKeyModalOpen}>
+      <Dialog
+        open={warehouseKeyModalOpen}
+        onOpenChange={setWarehouseKeyModalOpen}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Warehouse Access Key Required</DialogTitle>

@@ -16,7 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Search,
+  X,
 } from "lucide-react";
 import { useMerchantSession } from "@/components/merchant-session-provider";
 
@@ -26,6 +28,10 @@ export default function MerchantsProductsPage() {
   const [loading, setLoading] = useState(true);
   const [newMerchant, setNewMerchant] = useState("");
   const [expandedMerchant, setExpandedMerchant] = useState<string | null>(null);
+
+  // Search & filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "pending">("all");
 
   // Add Product State
   const [newProductName, setNewProductName] = useState("");
@@ -86,13 +92,13 @@ export default function MerchantsProductsPage() {
     const { error } = await supabase!
       .from("merchants")
       .insert([{ name: newMerchant, ...getApprovalFields() }]);
-    
+
     if (error) toast.error("Failed to add merchant");
     else {
       toast.success(
         role === "guest"
           ? "Merchant added — awaiting Admin & Warehouse approval"
-          : `Merchant added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`
+          : `Merchant added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`,
       );
       setNewMerchant("");
       fetchMerchants();
@@ -117,7 +123,7 @@ export default function MerchantsProductsPage() {
       toast.success(
         role === "guest"
           ? "Product added — awaiting Admin & Warehouse approval"
-          : `Product added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`
+          : `Product added — awaiting ${role === "admin" ? "Warehouse" : "Admin"} approval`,
       );
       setNewProductName("");
       setNewProductPrice("");
@@ -171,8 +177,12 @@ export default function MerchantsProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Merchants & Products</h1>
-          <p className="text-slate-500 mt-1">Manage merchants and their product catalogues.</p>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Merchants & Products
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Manage merchants and their product catalogues.
+          </p>
         </div>
       </div>
 
@@ -195,8 +205,52 @@ export default function MerchantsProductsPage() {
       </Card>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-slate-900">All Merchants</h2>
-        
+        {/* Sticky Search & Filter bar */}
+        <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-white/80 backdrop-blur-md border-b border-slate-200/70 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-bold text-slate-900">All Merchants</h2>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <Input
+                  id="merchant-search"
+                  placeholder="Search merchants…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 w-56"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status filter tabs */}
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 gap-0.5">
+                {(["all", "approved", "pending"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setStatusFilter(f)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-colors ${
+                      statusFilter === f
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <Card className="p-12 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
@@ -206,9 +260,37 @@ export default function MerchantsProductsPage() {
             No merchants added yet.
           </Card>
         ) : (
-          merchants.map((merchant) => (
+          (() => {
+            const filtered = merchants.filter((m) => {
+              const matchesSearch = m.name
+                .toLowerCase()
+                .includes(searchQuery.toLowerCase().trim());
+              const matchesStatus =
+                statusFilter === "all" ||
+                (m.approval_status || "approved") === statusFilter;
+              return matchesSearch && matchesStatus;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <Card className="p-12 text-center">
+                  <Search className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                  <p className="text-slate-500">
+                    No merchants match your search.
+                  </p>
+                  <button
+                    onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}
+                    className="mt-2 text-xs text-primary underline"
+                  >
+                    Clear filters
+                  </button>
+                </Card>
+              );
+            }
+
+            return filtered.map((merchant) => (
             <Card key={merchant.id} className="overflow-hidden">
-              <div 
+              <div
                 className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
                 onClick={() => handleToggleMerchant(merchant.id)}
               >
@@ -217,9 +299,13 @@ export default function MerchantsProductsPage() {
                     <Store className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">{merchant.name}</h3>
-                    <div className="mt-1">
-                      <StatusBadge status={merchant.approval_status || "approved"} />
+                    <h3 className="font-bold text-slate-900">
+                      {merchant.name}
+                    </h3>
+                    <div className="mt-1 w-fit">
+                      <StatusBadge
+                        status={merchant.approval_status || "approved"}
+                      />
                     </div>
                   </div>
                 </div>
@@ -234,65 +320,104 @@ export default function MerchantsProductsPage() {
                 <div className="p-4 border-t border-slate-100 bg-white">
                   <div className="mb-6 space-y-3">
                     <h4 className="text-sm font-semibold flex items-center gap-2 text-slate-700">
-                      <Package className="h-4 w-4" /> Add Product to {merchant.name}
+                      <Package className="h-4 w-4" /> Add Product to{" "}
+                      {merchant.name}
                     </h4>
                     <div className="flex items-center gap-3">
                       <Input
                         placeholder="Product Name"
                         value={newProductName}
                         onChange={(e) => setNewProductName(e.target.value)}
-                        className="max-w-[200px]"
+                        className="max-w-50"
                       />
                       <Input
                         type="number"
                         placeholder="Price (₦)"
                         value={newProductPrice}
                         onChange={(e) => setNewProductPrice(e.target.value)}
-                        className="max-w-[120px]"
+                        className="max-w-30"
                       />
-                      <Button onClick={() => handleAddProduct(merchant.id)} size="sm">
+                      <Button
+                        onClick={() => handleAddProduct(merchant.id)}
+                        size="sm"
+                      >
                         Add Product
                       </Button>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Products Catalogue</h4>
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">
+                      Products Catalogue
+                    </h4>
                     {!products[merchant.id] ? (
                       <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     ) : products[merchant.id].length === 0 ? (
-                      <p className="text-sm text-slate-500 italic">No products added for this merchant.</p>
+                      <p className="text-sm text-slate-500 italic">
+                        No products added for this merchant.
+                      </p>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {products[merchant.id].map((product) => (
-                          <div key={product.id} className="border rounded-xl p-3 bg-slate-50/50">
+                          <div
+                            key={product.id}
+                            className="border rounded-xl p-3 bg-slate-50/50"
+                          >
                             {editingProductId === product.id ? (
                               <div className="space-y-2">
                                 <Input
                                   size={1}
                                   value={editProductName}
-                                  onChange={(e) => setEditProductName(e.target.value)}
+                                  onChange={(e) =>
+                                    setEditProductName(e.target.value)
+                                  }
                                   className="h-8 text-sm"
                                 />
                                 <Input
                                   size={1}
                                   type="number"
                                   value={editProductPrice}
-                                  onChange={(e) => setEditProductPrice(e.target.value)}
+                                  onChange={(e) =>
+                                    setEditProductPrice(e.target.value)
+                                  }
                                   className="h-8 text-sm"
                                 />
                                 <div className="flex gap-2">
-                                  <Button size="sm" onClick={() => handleUpdateProduct(product.id, merchant.id)}>Save</Button>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingProductId(null)}>Cancel</Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      handleUpdateProduct(
+                                        product.id,
+                                        merchant.id,
+                                      )
+                                    }
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingProductId(null)}
+                                  >
+                                    Cancel
+                                  </Button>
                                 </div>
                               </div>
                             ) : (
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="font-semibold text-sm">{product.name}</p>
-                                  <p className="text-xs text-primary font-mono font-medium">₦{Number(product.price).toLocaleString()}</p>
+                                  <p className="font-semibold text-sm">
+                                    {product.name}
+                                  </p>
+                                  <p className="text-xs text-primary font-mono font-medium">
+                                    ₦{Number(product.price).toLocaleString()}
+                                  </p>
                                   <div className="mt-1">
-                                    <StatusBadge status={product.approval_status || "approved"} />
+                                    <StatusBadge
+                                      status={
+                                        product.approval_status || "approved"
+                                      }
+                                    />
                                   </div>
                                 </div>
                                 <div className="flex gap-1">
@@ -310,7 +435,12 @@ export default function MerchantsProductsPage() {
                                   <Button
                                     size="icon-sm"
                                     variant="ghost"
-                                    onClick={() => handleDeleteProduct(product.id, merchant.id)}
+                                    onClick={() =>
+                                      handleDeleteProduct(
+                                        product.id,
+                                        merchant.id,
+                                      )
+                                    }
                                   >
                                     <Trash2 className="h-3 w-3 text-red-500" />
                                   </Button>
@@ -325,7 +455,8 @@ export default function MerchantsProductsPage() {
                 </div>
               )}
             </Card>
-          ))
+            ));
+          })()
         )}
       </div>
     </div>
