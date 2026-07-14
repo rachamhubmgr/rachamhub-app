@@ -205,17 +205,15 @@ export default function InventoryPage() {
         label: "FOM Assigned",
         render: (row) => {
           const isEditing = editingId === String(row.id);
-
           if (!isEditing)
             return (
               fomUsers.find((user) => user.id === (row as any).fom_assigned)
                 ?.display_name || "—"
             );
-
-          return (
+          return !((row as any).rider_name) ? (
             <select
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
-              value={(editForm as any)?.fom_assigned || "—"}
+              value={(editForm as any)?.fom_assigned || ""}
               onChange={(event) =>
                 setEditForm((prev) =>
                   prev ? { ...prev, fom_assigned: event.target.value } : prev,
@@ -228,6 +226,9 @@ export default function InventoryPage() {
                 </option>
               ))}
             </select>
+          ) : (
+            fomUsers.find((user) => user.id === (row as any).fom_assigned)
+              ?.display_name || "—"
           );
         },
         getSearchableText: (row) =>
