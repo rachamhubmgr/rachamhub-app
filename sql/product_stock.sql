@@ -24,6 +24,9 @@ CREATE TABLE stock_entries (
   quantity INTEGER NOT NULL,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+  admin_approved BOOLEAN NOT NULL DEFAULT false,
+  warehouse_approved BOOLEAN NOT NULL DEFAULT false,
+  customer_service_approved BOOLEAN NOT NULL DEFAULT false,
   submitted_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_at TIMESTAMP WITH TIME ZONE,

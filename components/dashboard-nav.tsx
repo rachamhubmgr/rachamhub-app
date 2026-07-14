@@ -87,6 +87,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: "/merchant/login",
           icon: Store,
         },
+        {
+          label: "Breakdown",
+          href: `/dashboard/${user.role}/breakdown`,
+          icon: ClipboardList,
+        },
       ],
       warehouse: [
         {
@@ -103,6 +108,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           label: "Out-of-Stock",
           href: `/dashboard/${user.role}/out-of-stock`,
           icon: AlertTriangle,
+        },
+        {
+          label: "Breakdown",
+          href: `/dashboard/${user.role}/breakdown`,
+          icon: ClipboardList,
         },
         {
           label: "Merchant Dashboard",
@@ -142,11 +152,6 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           label: "Payments",
           href: `/dashboard/${user.role}/payments`,
           icon: DollarSign,
-        },
-        {
-          label: "Breakdown",
-          href: `/dashboard/${user.role}/breakdown`,
-          icon: ClipboardList,
         },
       ],
       admin: [

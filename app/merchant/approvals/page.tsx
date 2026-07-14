@@ -42,17 +42,31 @@ export default function MerchantApprovalsPage() {
   const canApprove = (item: any) => {
     if (role === "admin" && !item.admin_approved) return true;
     if (role === "warehouse" && !item.warehouse_approved) return true;
+    if (
+      role === "customer_service" &&
+      item.admin_approved &&
+      item.warehouse_approved &&
+      !item.customer_service_approved
+    ) {
+      return true;
+    }
     return false;
   };
 
   const handleApprove = async (table: string, item: any) => {
     const isNowAdminApproved = role === "admin" || item.admin_approved;
     const isNowWarehouseApproved = role === "warehouse" || item.warehouse_approved;
-    const isFullyApproved = isNowAdminApproved && isNowWarehouseApproved;
+    const isNowCustomerServiceApproved =
+      role === "customer_service" || item.customer_service_approved;
+    const isFullyApproved =
+      isNowAdminApproved &&
+      isNowWarehouseApproved &&
+      isNowCustomerServiceApproved;
 
     const updates: any = {
       admin_approved: isNowAdminApproved,
       warehouse_approved: isNowWarehouseApproved,
+      customer_service_approved: isNowCustomerServiceApproved,
     };
 
     if (table === "stock_entries") {
@@ -95,7 +109,15 @@ export default function MerchantApprovalsPage() {
     }
   };
 
-  const ApprovalBadge = ({ admin, warehouse }: { admin: boolean; warehouse: boolean }) => (
+  const ApprovalBadge = ({
+    admin,
+    warehouse,
+    customerService,
+  }: {
+    admin: boolean;
+    warehouse: boolean;
+    customerService: boolean;
+  }) => (
     <div className="flex gap-2 text-[10px] font-semibold uppercase">
       <span className={`px-2 py-0.5 rounded-full ${admin ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
         Admin: {admin ? "Yes" : "No"}
@@ -103,10 +125,13 @@ export default function MerchantApprovalsPage() {
       <span className={`px-2 py-0.5 rounded-full ${warehouse ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
         WH: {warehouse ? "Yes" : "No"}
       </span>
+      <span className={`px-2 py-0.5 rounded-full ${customerService ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+        CS: {customerService ? "Yes" : "No"}
+      </span>
     </div>
   );
 
-  if (role !== "admin" && role !== "warehouse") {
+  if (role !== "admin" && role !== "warehouse" && role !== "customer_service") {
     return (
       <div className="p-12 text-center text-slate-500">
         You do not have permission to view this page.
@@ -145,7 +170,7 @@ export default function MerchantApprovalsPage() {
                       <p className="font-semibold text-slate-900">{merchant.name}</p>
                       <p className="text-xs text-slate-400 mt-1">Submitted by: <span className="capitalize">{merchant.submitted_by_role}</span></p>
                       <div className="mt-2">
-                        <ApprovalBadge admin={merchant.admin_approved} warehouse={merchant.warehouse_approved} />
+                      <ApprovalBadge admin={merchant.admin_approved} warehouse={merchant.warehouse_approved} customerService={merchant.customer_service_approved} />
                       </div>
                     </div>
                     {canApprove(merchant) && (
@@ -196,7 +221,7 @@ export default function MerchantApprovalsPage() {
                       <p className="text-xs text-slate-400">Submitted by: <span className="capitalize">{product.submitted_by_role}</span></p>
                     </div>
                     <div className="mt-3 pt-3 border-t">
-                      <ApprovalBadge admin={product.admin_approved} warehouse={product.warehouse_approved} />
+                      <ApprovalBadge admin={product.admin_approved} warehouse={product.warehouse_approved} customerService={product.customer_service_approved} />
                     </div>
                   </Card>
                 ))}
@@ -234,7 +259,7 @@ export default function MerchantApprovalsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 ml-4">
-                      <ApprovalBadge admin={entry.admin_approved} warehouse={entry.warehouse_approved} />
+                      <ApprovalBadge admin={entry.admin_approved} warehouse={entry.warehouse_approved} customerService={entry.customer_service_approved} />
                       {canApprove(entry) && (
                         <div className="flex gap-2 pl-4 border-l">
                           <Button size="icon-sm" variant="outline" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove("stock_entries", entry)}>

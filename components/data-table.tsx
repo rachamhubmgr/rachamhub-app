@@ -177,6 +177,7 @@ export default function DataTable({
   renderRowActions,
 }: DataTableProps) {
   const columns = useMemo(() => headers.map(normalizeColumn), [headers]);
+  const serialColumnWidth = "64px";
 
   const [tableRows, setTableRows] = useState<DataTableRow[]>(rows);
   const [searchText, setSearchText] = useState("");
@@ -479,6 +480,15 @@ export default function DataTable({
           <table className="table-fixed w-full border-collapse relative">
             <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-md shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
               <TableRow>
+                <th
+                  style={{
+                    width: serialColumnWidth,
+                    minWidth: serialColumnWidth,
+                  }}
+                  className="relative overflow-hidden border-r border-border h-10 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground align-middle"
+                >
+                  S/N
+                </th>
                 {columns.map((column) => (
                   <th
                     key={column.key}
@@ -521,7 +531,9 @@ export default function DataTable({
                 <TableRow>
                   <TableCell
                     colSpan={
-                      columns.length + (showActions || renderRowActions ? 1 : 0)
+                      columns.length +
+                      1 +
+                      (showActions || renderRowActions ? 1 : 0)
                     }
                     className="h-24 text-center text-muted-foreground text-xs"
                   >
@@ -537,6 +549,15 @@ export default function DataTable({
                       key={String(rowId)}
                       className="hover:bg-muted/20 transition-colors border-b border-border group"
                     >
+                      <TableCell
+                        style={{
+                          width: serialColumnWidth,
+                          minWidth: serialColumnWidth,
+                        }}
+                        className="border-r border-border py-1.5 px-3 group-hover:bg-transparent bg-white text-xs font-semibold text-muted-foreground"
+                      >
+                        {rowIndex + 1}
+                      </TableCell>
                       {columns.map((column) => (
                         <TableCell
                           key={`${String(rowId)}-${column.key}`}

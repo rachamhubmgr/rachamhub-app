@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/components/auth-context";
+import { toast } from "sonner";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-purple-100 text-purple-900",
@@ -46,6 +49,9 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  const [warehouseKeyModalOpen, setWarehouseKeyModalOpen] = useState(false);
+  const [warehouseAccessKey, setWarehouseAccessKey] = useState("");
+  const { user } = useAuth();
 
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
@@ -159,7 +165,39 @@ export default function InventoryPage() {
       {
         key: "warehouse_status",
         label: "Warehouse Status",
-        render: (row) => (row as any).warehouse_status || "unpacked",
+        render: (row) => {
+          const isEditing = editingId === String(row.id);
+          const inventoryDelivered =
+            String((row as any).inventory_status || "").toLowerCase() ===
+            "delivered";
+          const fomDelivered =
+            String((row as any).fom_delivery_status || "").toLowerCase() ===
+            "delivered";
+          const canMarkOutOfStock = !inventoryDelivered && !fomDelivered;
+
+          if (!isEditing) return (row as any).warehouse_status || "unpacked";
+
+          return (
+            <select
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
+              value={(editForm as any)?.warehouse_status || "unpacked"}
+              onChange={(event) =>
+                setEditForm((prev) =>
+                  prev
+                    ? { ...prev, warehouse_status: event.target.value }
+                    : prev,
+                )
+              }
+            >
+              <option value={(row as any).warehouse_status || "unpacked"}>
+                {(row as any).warehouse_status || "unpacked"}
+              </option>
+              {canMarkOutOfStock ? (
+                <option value="out-of-stock">out-of-stock</option>
+              ) : null}
+            </select>
+          );
+        },
         getSearchableText: (row) => (row as any).warehouse_status || "unpacked",
       },
       {
@@ -256,13 +294,52 @@ export default function InventoryPage() {
     setCommentModalOpen(false);
   };
 
+  const verifyWarehouseAccessKey = useCallback(async () => {
+    if (!user?.uid || !warehouseAccessKey.trim()) return false;
+
+    const { data, error } = await supabase!
+      .from("merchant_access_keys")
+      .select("id")
+      .eq("id", user.uid)
+      .eq("role", "warehouse")
+      .eq("access_key", warehouseAccessKey.trim())
+      .maybeSingle();
+
+    return !error && Boolean(data);
+  }, [user?.uid, warehouseAccessKey]);
+
   const handleSave = useCallback(async () => {
     if (!editForm) return;
+
+    const originalOrder = orders.find((order) => order.id === editForm.id);
+    const originalWarehouseStatus = String(
+      (originalOrder as any)?.warehouse_status || "",
+    ).toLowerCase();
+    const nextWarehouseStatus = String(
+      (editForm as any).warehouse_status || "",
+    ).toLowerCase();
+    const isMarkingOutOfStock =
+      nextWarehouseStatus === "out-of-stock" &&
+      originalWarehouseStatus !== "out-of-stock";
+
+    if (isMarkingOutOfStock && !warehouseKeyModalOpen) {
+      setWarehouseKeyModalOpen(true);
+      return;
+    }
 
     setIsSaving(true);
     setError(null);
 
     try {
+      if (isMarkingOutOfStock) {
+        const isValidKey = await verifyWarehouseAccessKey();
+        if (!isValidKey) {
+          toast.error("Invalid warehouse merchant dashboard access key.");
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const { error: updateError } = await supabase!
         .from("orders")
         .update({
@@ -279,12 +356,19 @@ export default function InventoryPage() {
 
       setEditingId(null);
       setEditForm(null);
+      setWarehouseAccessKey("");
+      setWarehouseKeyModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order");
     } finally {
       setIsSaving(false);
     }
-  }, [editForm]);
+  }, [
+    editForm,
+    orders,
+    verifyWarehouseAccessKey,
+    warehouseKeyModalOpen,
+  ]);
 
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
 
@@ -435,6 +519,41 @@ export default function InventoryPage() {
               Cancel
             </Button>
             <Button onClick={handleSaveComment}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={warehouseKeyModalOpen} onOpenChange={setWarehouseKeyModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Warehouse Access Key Required</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <Label htmlFor="warehouse-access-key">Access Key</Label>
+            <Input
+              id="warehouse-access-key"
+              type="password"
+              value={warehouseAccessKey}
+              onChange={(event) => setWarehouseAccessKey(event.target.value)}
+              placeholder="Enter warehouse merchant dashboard key"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWarehouseKeyModalOpen(false);
+                setWarehouseAccessKey("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirm
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

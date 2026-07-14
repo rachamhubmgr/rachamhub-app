@@ -80,6 +80,41 @@ alter table public.admin_audit enable row level security;
 create policy admin_audit_dev_allow_all on public.admin_audit for all using (true) with check (true);
 
 -- =====================
+-- merchant dashboard access
+-- =====================
+create table if not exists public.merchant_access_keys (
+  id uuid not null references public.users(id) on delete cascade,
+  role text not null check (role in ('admin', 'warehouse', 'customer_service')),
+  access_key text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (id, role)
+);
+
+create table if not exists public.products (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references public.merchants(id) on delete cascade,
+  name text not null,
+  price numeric not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.stock_entries (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references public.merchants(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
+  quantity integer not null,
+  notes text,
+  status text not null default 'pending',
+  submitted_by uuid references public.users(id) on delete set null,
+  approved_by uuid references public.users(id) on delete set null,
+  approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- =====================
 -- orders
 -- Note: `delivery_status` (shared) removed. We have role-specific fields:
 --  - inventory_status
@@ -151,6 +186,15 @@ create trigger riders_set_updated_at before update on public.riders for each row
 drop trigger if exists landmarks_set_updated_at on public.landmarks;
 create trigger landmarks_set_updated_at before update on public.landmarks for each row execute procedure public.set_updated_at();
 
+drop trigger if exists merchant_access_keys_set_updated_at on public.merchant_access_keys;
+create trigger merchant_access_keys_set_updated_at before update on public.merchant_access_keys for each row execute procedure public.set_updated_at();
+
+drop trigger if exists products_set_updated_at on public.products;
+create trigger products_set_updated_at before update on public.products for each row execute procedure public.set_updated_at();
+
+drop trigger if exists stock_entries_set_updated_at on public.stock_entries;
+create trigger stock_entries_set_updated_at before update on public.stock_entries for each row execute procedure public.set_updated_at();
+
 -- =====================
 -- Row Level Security (DEVELOPMENT - permissive)
 -- Review and tighten before production
@@ -173,6 +217,15 @@ create policy riders_dev_allow_all on public.riders for all using (true) with ch
 alter table public.landmarks enable row level security;
 create policy landmarks_dev_allow_all on public.landmarks for all using (true) with check (true);
 
+alter table public.merchant_access_keys enable row level security;
+create policy merchant_access_keys_dev_allow_all on public.merchant_access_keys for all using (true) with check (true);
+
+alter table public.products enable row level security;
+create policy products_dev_allow_all on public.products for all using (true) with check (true);
+
+alter table public.stock_entries enable row level security;
+create policy stock_entries_dev_allow_all on public.stock_entries for all using (true) with check (true);
+
 -- =====================
 -- Indexes and constraints
 -- =====================
@@ -186,6 +239,26 @@ create unique index if not exists users_email_key on public.users using btree (e
 
 alter table public.orders
   add constraint orders_pkey primary key (id);
+
+alter table public.merchants
+  add column if not exists approval_status text not null default 'approved',
+  add column if not exists admin_approved boolean not null default true,
+  add column if not exists warehouse_approved boolean not null default true,
+  add column if not exists customer_service_approved boolean not null default true,
+  add column if not exists submitted_by_role text;
+
+alter table public.products
+  add column if not exists approval_status text not null default 'approved',
+  add column if not exists admin_approved boolean not null default true,
+  add column if not exists warehouse_approved boolean not null default true,
+  add column if not exists customer_service_approved boolean not null default true,
+  add column if not exists submitted_by_role text;
+
+alter table public.stock_entries
+  add column if not exists admin_approved boolean not null default false,
+  add column if not exists warehouse_approved boolean not null default false,
+  add column if not exists customer_service_approved boolean not null default false,
+  add column if not exists submitted_by_role text;
 
 -- =====================
 -- Sample/demo data

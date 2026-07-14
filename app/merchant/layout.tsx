@@ -12,6 +12,7 @@ import {
   Menu,
   User,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -79,7 +80,13 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
       label: "Pending Approvals",
       href: "/merchant/approvals",
       icon: CheckSquare,
-      roles: ["admin", "warehouse"],
+      roles: ["admin", "warehouse", "customer_service"],
+    },
+    {
+      label: "User Access",
+      href: "/merchant/users",
+      icon: Users,
+      roles: ["admin"],
     },
   ];
 
