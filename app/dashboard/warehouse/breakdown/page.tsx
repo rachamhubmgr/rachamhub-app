@@ -1,3 +1,3 @@
-import ProductBreakdownPage from "@/components/product-breakdown-page";
+import MerchantBreakdownPage from "@/components/merchant-breakdown-page";
 
-export default ProductBreakdownPage;
+export default MerchantBreakdownPage;

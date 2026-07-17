@@ -87,6 +87,24 @@ export default function PaymentsPage() {
         }),
     },
     {
+      key: "delivered_at",
+      label: "Delivered At",
+      render: (row) =>
+        (row as any).delivered_at
+          ? new Date((row as any).delivered_at).toLocaleString([], {
+              dateStyle: "short",
+              timeStyle: "short",
+            })
+          : "—",
+      getSearchableText: (row) =>
+        (row as any).delivered_at
+          ? new Date((row as any).delivered_at).toLocaleString([], {
+              dateStyle: "short",
+              timeStyle: "short",
+            })
+          : "",
+    },
+    {
       key: "customer_name",
       label: "Customer",
       longText: true,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Edit2, Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Edit2, Eye, EyeOff, Loader2, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,7 @@ export default function MerchantUsersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showKeyMap, setShowKeyMap] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -267,9 +268,31 @@ export default function MerchantUsersPage() {
                             }
                           />
                         ) : (
-                          <span className="font-mono text-xs">
-                            {row.access_key}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs">
+                              {showKeyMap[editKey]
+                                ? row.access_key
+                                : "•".repeat(
+                                    Math.min(row.access_key?.length ?? 8, 12),
+                                  )}
+                            </span>
+                            <button
+                              onClick={() =>
+                                setShowKeyMap((prev) => ({
+                                  ...prev,
+                                  [editKey]: !prev[editKey],
+                                }))
+                              }
+                              className="text-slate-400 hover:text-slate-600 transition-colors"
+                              aria-label={showKeyMap[editKey] ? "Hide key" : "Show key"}
+                            >
+                              {showKeyMap[editKey] ? (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td className="p-3">
@@ -295,16 +318,20 @@ export default function MerchantUsersPage() {
                             </>
                           ) : (
                             <>
-                              <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingId(editKey);
-                                  setEditingKey(row.access_key || "");
-                                }}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
+                              {/* Change access key — admin only */}
+                              {role === "admin" && (
+                                <Button
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  title="Change access key"
+                                  onClick={() => {
+                                    setEditingId(editKey);
+                                    setEditingKey(row.access_key || "");
+                                  }}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 size="icon-sm"
                                 variant="ghost"

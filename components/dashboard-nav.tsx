@@ -131,11 +131,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/orders`,
           icon: Package,
         },
-        // {
-        //   label: "Rider Payments",
-        //   href: `/dashboard/${user.role}/rider-payments`,
-        //   icon: Bike,
-        // },
+        {
+          label: "Rider Payments",
+          href: `/dashboard/${user.role}/rider-payments`,
+          icon: Bike,
+        },
       ],
       accounting: [
         {
