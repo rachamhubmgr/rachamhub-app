@@ -134,6 +134,8 @@ export default function FOMOrdersPage() {
     const landmarkPrice = selectedLandmark ? Number(selectedLandmark.price) : 0;
     const paymentToMerchant =
       Number((editForm.amount_paid as any) || 0) - landmarkPrice;
+    const isDelivered =
+      editForm.fom_delivery_status?.toLowerCase() === "delivered";
 
     setIsSaving(true);
     setError(null);
@@ -150,6 +152,7 @@ export default function FOMOrdersPage() {
           fom_comment: editForm.fom_comment,
           payment_to_merchant: paymentToMerchant,
           updated_at: new Date().toISOString(),
+          ...(isDelivered ? { delivered_at: new Date().toISOString() } : {}),
         })
         .eq("id", editForm.id);
 
@@ -511,9 +514,11 @@ export default function FOMOrdersPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ExportButton 
-            disabled={loading || orders.length === 0} 
-            onExport={async (start, end, type) => await handleExport(foms, ccUsers, type, start, end)} 
+          <ExportButton
+            disabled={loading || orders.length === 0}
+            onExport={async (start, end, type) =>
+              await handleExport(foms, ccUsers, type, start, end)
+            }
           />
         </div>
       </div>

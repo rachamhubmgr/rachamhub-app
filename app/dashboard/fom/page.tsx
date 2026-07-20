@@ -163,9 +163,6 @@ export default function FOMDashboard() {
         : 0;
       const paymentByMerchant = Number(order.total_amount) - landmarkPrice;
 
-      const isDelivered =
-        inputs.delivery_status?.toLowerCase() === "delivered";
-
       try {
         const { error } = await supabase!
           .from("orders")
@@ -180,7 +177,6 @@ export default function FOMDashboard() {
             fom_comment: inputs.fom_comment,
             updated_at: new Date().toISOString(),
             rider_assigned_at: new Date().toISOString(),
-            ...(isDelivered ? { delivered_at: new Date().toISOString() } : {}),
           })
           .eq("id", order.id);
 
