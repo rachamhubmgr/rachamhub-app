@@ -42,17 +42,16 @@ export default function RiderPaymentsPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const startOfDay = new Date(dateFilter);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(dateFilter);
-      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDay = new Date(`${dateFilter}T05:00:00`);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
 
       const { data, error } = await supabase!
         .from("orders")
         .select("*")
         .not("rider_name", "is", null)
         .gte("rider_assigned_at", startOfDay.toISOString())
-        .lte("rider_assigned_at", endOfDay.toISOString())
+        .lt("rider_assigned_at", endOfDay.toISOString())
         .order("rider_assigned_at", { ascending: false });
 
       if (error) throw error;

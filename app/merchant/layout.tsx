@@ -25,12 +25,8 @@ import {
 function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const {
-    role,
-    loading,
-    hasNormalDashboardSession,
-    signOutMerchant,
-  } = useMerchantSession();
+  const { role, loading, hasNormalDashboardSession, signOutMerchant } =
+    useMerchantSession();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -62,7 +58,7 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
       label: "Stock Addition",
       href: "/merchant/stock",
       icon: Archive,
-      roles: ["admin", "warehouse", "guest"],
+      roles: ["admin", "warehouse", "customer_service", "guest"],
     },
     {
       label: "Merchants & Products",
@@ -111,7 +107,13 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-800">
             <div className="rounded-lg bg-white p-1">
-              <Image src="/rachamhub-logo.jpeg" alt="Logo" width={32} height={32} className="rounded-md" />
+              <Image
+                src="/rachamhub-logo.jpeg"
+                alt="Logo"
+                width={32}
+                height={32}
+                className="rounded-md"
+              />
             </div>
             <div>
               <h1 className="text-lg font-bold">Merchant Panel</h1>
@@ -133,7 +135,9 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
                       : "text-slate-300 hover:bg-slate-800 hover:text-white"
                   }`}
                 >
-                  <item.icon className={`h-5 w-5 ${isActive ? "text-primary-foreground" : "text-slate-400"}`} />
+                  <item.icon
+                    className={`h-5 w-5 ${isActive ? "text-primary-foreground" : "text-slate-400"}`}
+                  />
                   {item.label}
                 </Link>
               );
@@ -180,7 +184,9 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
               ) : (
                 <ShieldCheck className="h-4 w-4 text-primary" />
               )}
-              <span className="text-sm font-semibold capitalize text-slate-700">{role} Mode</span>
+              <span className="text-sm font-semibold capitalize text-slate-700">
+                {role} Mode
+              </span>
             </div>
           </div>
         </header>
@@ -193,7 +199,11 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function MerchantLayout({ children }: { children: React.ReactNode }) {
+export default function MerchantLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <MerchantSessionProvider>
       <MerchantLayoutContent>{children}</MerchantLayoutContent>

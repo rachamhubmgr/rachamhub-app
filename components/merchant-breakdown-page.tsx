@@ -28,6 +28,7 @@ type BreakdownOrder = {
   rider_name?: string | null;
   landmark?: string | null;
   created_at: string;
+  delivery_at?: string | null;
 };
 
 export default function MerchantBreakdownPage() {
@@ -67,7 +68,7 @@ export default function MerchantBreakdownPage() {
 
     setOrdersLoading(true);
     try {
-      const start = new Date(`${breakdownDate}T00:00:00`);
+      const start = new Date(`${breakdownDate}T05:00:00`);
       const end = new Date(start);
       end.setDate(end.getDate() + 1);
 
@@ -75,9 +76,9 @@ export default function MerchantBreakdownPage() {
         .from("orders")
         .select("*")
         .eq("merchant", merchant.name)
-        .gte("created_at", start.toISOString())
-        .lt("created_at", end.toISOString())
-        .order("created_at", { ascending: false });
+        .gte("delivery_at", start.toISOString())
+        .lt("delivery_at", end.toISOString())
+        .order("delivery_at", { ascending: false });
 
       if (error) throw error;
       setOrders((data ?? []) as BreakdownOrder[]);
@@ -157,12 +158,11 @@ export default function MerchantBreakdownPage() {
 
       const para = (text: string, bold = false) =>
         new Paragraph({
-          children: [
-            new TextRun({ text, bold, font: "Arial", size: 22 }),
-          ],
+          children: [new TextRun({ text, bold, font: "Arial", size: 22 })],
         });
 
-      const blank = () => new Paragraph({ children: [new TextRun({ text: "", size: 22 })] });
+      const blank = () =>
+        new Paragraph({ children: [new TextRun({ text: "", size: 22 })] });
 
       const paragraphs: Paragraph[] = [
         para(selectedMerchant.name.toUpperCase(), true),
@@ -172,25 +172,22 @@ export default function MerchantBreakdownPage() {
 
       // Each order
       for (const order of orders) {
-        const isFailed =
-          order.fom_delivery_status?.toLowerCase() === "failed";
-        const statusLabel = isFailed ? "Failed Delivery" : "Delivered";
+        const isFailed = order.fom_delivery_status?.toLowerCase() === "failed";
         const landmark = order.landmark || "—";
         const riderFee = Number(order.payment_to_rider || 0);
         const landmarkLine = `${landmark} – ${riderFee.toLocaleString()}`;
+        const amount = isFailed
+          ? "" // failed: no amount
+          : `-${Number(order.total_amount || 0).toLocaleString()}`;
 
-        paragraphs.push(para(statusLabel, true));
+        paragraphs.push(para(order.fom_delivery_status!?.toLowerCase(), true));
         paragraphs.push(para(order.customer_name));
         paragraphs.push(para(landmarkLine));
 
         for (const item of order.items ?? []) {
-          const amount = isFailed
-            ? "" // failed: no amount
-            : `-${Number(order.total_amount || 0).toLocaleString()}`;
-          paragraphs.push(
-            para(`${item.quantity} ${item.name}  ${amount}`),
-          );
+          paragraphs.push(para(`${item.quantity} ${item.name}`));
         }
+        paragraphs.push(para(`Total = ${amount}`, true));
         paragraphs.push(blank());
       }
 
@@ -205,11 +202,15 @@ export default function MerchantBreakdownPage() {
       const totalBalance = totalOrder - totalDelivery;
 
       paragraphs.push(para(`Total order =${totalOrder.toLocaleString()}`));
-      paragraphs.push(para(`Total Delivery =${totalDelivery.toLocaleString()}`));
+      paragraphs.push(
+        para(`Total Delivery =${totalDelivery.toLocaleString()}`),
+      );
       paragraphs.push(para("Total service charge="));
       paragraphs.push(blank());
       paragraphs.push(blank());
-      paragraphs.push(para(`Total balance= ${totalBalance.toLocaleString()}`, true));
+      paragraphs.push(
+        para(`Total balance= ${totalBalance.toLocaleString()}`, true),
+      );
       paragraphs.push(blank());
 
       // Stock count section
@@ -478,9 +479,7 @@ export default function MerchantBreakdownPage() {
                         <td className="p-3 text-xs">
                           {order.rider_name || "—"}
                         </td>
-                        <td className="p-3 text-xs">
-                          {order.landmark || "—"}
-                        </td>
+                        <td className="p-3 text-xs">{order.landmark || "—"}</td>
                         <td className="p-3">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${

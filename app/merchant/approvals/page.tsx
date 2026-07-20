@@ -22,9 +22,18 @@ export default function MerchantApprovalsPage() {
     setLoading(true);
     try {
       const [merchantsRes, productsRes, stockRes] = await Promise.all([
-        supabase!.from("merchants").select("*").eq("approval_status", "pending"),
-        supabase!.from("products").select("*, merchants(name)").eq("approval_status", "pending"),
-        supabase!.from("stock_entries").select("*, products(name), merchants(name)").eq("status", "pending"),
+        supabase!
+          .from("merchants")
+          .select("*")
+          .eq("approval_status", "pending"),
+        supabase!
+          .from("products")
+          .select("*, merchants(name)")
+          .eq("approval_status", "pending"),
+        supabase!
+          .from("stock_entries")
+          .select("*, products(name), merchants(name)")
+          .eq("status", "pending"),
       ]);
 
       if (merchantsRes.data) setPendingMerchants(merchantsRes.data);
@@ -56,14 +65,17 @@ export default function MerchantApprovalsPage() {
   };
 
   const handleApprove = async (table: string, item: any) => {
-    const isNowAdminApproved = role === "admin" || item.admin_approved;
-    const isNowWarehouseApproved = role === "warehouse" || item.warehouse_approved;
+    const { data: { user } } = await supabase!.auth.getUser();
+    const userId = user?.id ?? null;
+
+    const isNowAdminApproved = role === "admin" ? userId : item.admin_approved ?? null;
+    const isNowWarehouseApproved = role === "warehouse" ? userId : item.warehouse_approved ?? null;
     const isNowCustomerServiceApproved =
-      role === "customer_service" || item.customer_service_approved;
+      role === "customer_service" ? userId : item.customer_service_approved ?? null;
     const isFullyApproved =
-      isNowAdminApproved &&
-      isNowWarehouseApproved &&
-      isNowCustomerServiceApproved;
+      !!isNowAdminApproved &&
+      !!isNowWarehouseApproved &&
+      !!isNowCustomerServiceApproved;
 
     const updates: any = {
       admin_approved: isNowAdminApproved,
@@ -74,7 +86,6 @@ export default function MerchantApprovalsPage() {
     if (table === "stock_entries") {
       if (isFullyApproved) {
         updates.status = "approved";
-        updates.approved_by = "system";
         updates.approved_at = new Date().toISOString();
       }
     } else {
@@ -84,7 +95,10 @@ export default function MerchantApprovalsPage() {
     }
 
     try {
-      const { error } = await supabase!.from(table).update(updates).eq("id", item.id);
+      const { error } = await supabase!
+        .from(table)
+        .update(updates)
+        .eq("id", item.id);
       if (error) throw error;
       toast.success(
         isFullyApproved
@@ -106,7 +120,10 @@ export default function MerchantApprovalsPage() {
     }
 
     try {
-      const { error } = await supabase!.from(table).update(updates).eq("id", itemId);
+      const { error } = await supabase!
+        .from(table)
+        .update(updates)
+        .eq("id", itemId);
       if (error) throw error;
       toast.success("Item rejected");
       fetchPendingItems();
@@ -120,9 +137,9 @@ export default function MerchantApprovalsPage() {
     warehouse,
     customerService,
   }: {
-    admin: boolean;
-    warehouse: boolean;
-    customerService: boolean;
+    admin: string | null;
+    warehouse: string | null;
+    customerService: string | null;
   }) => (
     <div className="flex gap-2 text-[10px] font-semibold uppercase">
       <span
@@ -173,7 +190,9 @@ export default function MerchantApprovalsPage() {
       {loading ? (
         <Card className="p-12 text-center border-0 shadow-sm">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-4 text-sm text-slate-500">Loading pending items...</p>
+          <p className="mt-4 text-sm text-slate-500">
+            Loading pending items...
+          </p>
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -203,17 +222,21 @@ export default function MerchantApprovalsPage() {
                 <p className="text-slate-500 text-sm">No pending merchants.</p>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {pendingMerchants.map((merchant) => (
                   <Card
                     key={merchant.id}
                     className="p-4 flex items-center justify-between border-0 shadow-sm"
                   >
                     <div>
-                      <p className="font-semibold text-slate-900">{merchant.name}</p>
+                      <p className="font-semibold text-slate-900">
+                        {merchant.name}
+                      </p>
                       <p className="text-xs text-slate-400 mt-1">
                         Submitted by:{" "}
-                        <span className="capitalize">{merchant.submitted_by_role}</span>
+                        <span className="capitalize">
+                          {merchant.submitted_by_role}
+                        </span>
                       </p>
                       <div className="mt-2">
                         <ApprovalBadge
@@ -266,7 +289,9 @@ export default function MerchantApprovalsPage() {
                     <div>
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold text-slate-900">{product.name}</p>
+                          <p className="font-semibold text-slate-900">
+                            {product.name}
+                          </p>
                           <p className="text-xs text-primary font-mono font-medium">
                             ₦{Number(product.price).toLocaleString()}
                           </p>
@@ -285,7 +310,9 @@ export default function MerchantApprovalsPage() {
                               size="icon-sm"
                               variant="ghost"
                               className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                              onClick={() => handleReject("products", product.id)}
+                              onClick={() =>
+                                handleReject("products", product.id)
+                              }
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -297,7 +324,9 @@ export default function MerchantApprovalsPage() {
                       </p>
                       <p className="text-xs text-slate-400">
                         Submitted by:{" "}
-                        <span className="capitalize">{product.submitted_by_role}</span>
+                        <span className="capitalize">
+                          {product.submitted_by_role}
+                        </span>
                       </p>
                     </div>
                     <div className="mt-3 pt-3 border-t">
@@ -318,10 +347,12 @@ export default function MerchantApprovalsPage() {
             {pendingStock.length === 0 ? (
               <Card className="p-12 text-center border-0 shadow-sm">
                 <Archive className="mx-auto h-8 w-8 text-slate-300 mb-3" />
-                <p className="text-slate-500 text-sm">No pending stock entries.</p>
+                <p className="text-slate-500 text-sm">
+                  No pending stock entries.
+                </p>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                 {pendingStock.map((entry) => (
                   <Card
                     key={entry.id}
@@ -342,7 +373,9 @@ export default function MerchantApprovalsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Quantity</p>
-                        <p className="text-sm font-bold text-primary">+{entry.quantity}</p>
+                        <p className="text-sm font-bold text-primary">
+                          +{entry.quantity}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Submitted By</p>
@@ -362,16 +395,20 @@ export default function MerchantApprovalsPage() {
                           <Button
                             size="icon-sm"
                             variant="outline"
-                            className="text-emerald-600 hover:bg-emerald-50"
-                            onClick={() => handleApprove("stock_entries", entry)}
+                            className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            onClick={() =>
+                              handleApprove("stock_entries", entry)
+                            }
                           >
                             <Check className="h-4 w-4" />
                           </Button>
                           <Button
                             size="icon-sm"
                             variant="outline"
-                            className="text-red-600 hover:bg-red-50"
-                            onClick={() => handleReject("stock_entries", entry.id)}
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() =>
+                              handleReject("stock_entries", entry.id)
+                            }
                           >
                             <X className="h-4 w-4" />
                           </Button>
