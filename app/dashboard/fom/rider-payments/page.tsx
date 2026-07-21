@@ -56,6 +56,7 @@ export default function RiderPaymentsPage() {
 
       if (error) throw error;
       setOrders(data || []);
+      console.log(data || []);
     } catch (err) {
       toast.error("Failed to load rider data");
     } finally {
@@ -203,7 +204,7 @@ export default function RiderPaymentsPage() {
               </div>
             ) : (
               filteredRiderGroups.map((entry) => {
-                const netPay = entry.totalPay - entry.outstanding;
+                const netPay = 0;
                 return (
                   <Card key={entry.rider} className="p-6 space-y-4">
                     <div className="flex items-center justify-between">

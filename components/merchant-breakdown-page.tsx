@@ -28,7 +28,7 @@ type BreakdownOrder = {
   rider_name?: string | null;
   landmark?: string | null;
   created_at: string;
-  delivery_at?: string | null;
+  delivered_at?: string | null;
 };
 
 export default function MerchantBreakdownPage() {
@@ -76,11 +76,12 @@ export default function MerchantBreakdownPage() {
         .from("orders")
         .select("*")
         .eq("merchant", merchant.name)
-        .gte("delivery_at", start.toISOString())
-        .lt("delivery_at", end.toISOString())
-        .order("delivery_at", { ascending: false });
+        .gte("delivered_at", start.toISOString())
+        .lt("delivered_at", end.toISOString())
+        .order("delivered_at", { ascending: false });
 
       if (error) throw error;
+      setOrders(data);
       setOrders((data ?? []) as BreakdownOrder[]);
     } catch {
       toast.error("Failed to load orders for the selected date.");
@@ -122,6 +123,14 @@ export default function MerchantBreakdownPage() {
         .select("items")
         .eq("merchant", selectedMerchant.name)
         .eq("fom_delivery_status", "delivered");
+
+      const { data: landmarksData } = await supabase!
+        .from("landmarks")
+        .select("name, price");
+      const landmarksMap = new Map<string, number>();
+      for (const l of landmarksData ?? []) {
+        if (l.name) landmarksMap.set(l.name.toLowerCase(), l.price || 0);
+      }
 
       // Build added map
       const addedMap: Record<string, number> = {};
@@ -174,7 +183,8 @@ export default function MerchantBreakdownPage() {
       for (const order of orders) {
         const isFailed = order.fom_delivery_status?.toLowerCase() === "failed";
         const landmark = order.landmark || "—";
-        const riderFee = Number(order.payment_to_rider || 0);
+        const landmarkPrice = landmarksMap.get(landmark.toLowerCase()) || 0;
+        const riderFee = Number(landmarkPrice);
         const landmarkLine = `${landmark} – ${riderFee.toLocaleString()}`;
         const amount = isFailed
           ? "" // failed: no amount
@@ -196,7 +206,10 @@ export default function MerchantBreakdownPage() {
         .filter((o) => o.fom_delivery_status?.toLowerCase() === "delivered")
         .reduce((s, o) => s + Number(o.total_amount || 0), 0);
       const totalDelivery = orders.reduce(
-        (s, o) => s + Number(o.payment_to_rider || 0),
+        (s, o) => {
+          const lPrice = landmarksMap.get((o.landmark || "").toLowerCase()) || 0;
+          return s + Number(lPrice);
+        },
         0,
       );
       const totalBalance = totalOrder - totalDelivery;

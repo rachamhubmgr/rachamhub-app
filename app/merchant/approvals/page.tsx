@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, Check, X, Store, Package, Archive } from "lucide-react";
+import { Loader2, Check, X, Store, Package, Archive, Pencil, Trash2 } from "lucide-react";
 import { useMerchantSession } from "@/components/merchant-session-provider";
 
 export default function MerchantApprovalsPage() {
@@ -17,6 +18,14 @@ export default function MerchantApprovalsPage() {
   const [pendingMerchants, setPendingMerchants] = useState<any[]>([]);
   const [pendingProducts, setPendingProducts] = useState<any[]>([]);
   const [pendingStock, setPendingStock] = useState<any[]>([]);
+
+  // Editing state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<"merchants" | "products" | "stock" | null>(null);
+  const [editMerchantName, setEditMerchantName] = useState("");
+  const [editProductName, setEditProductName] = useState("");
+  const [editProductPrice, setEditProductPrice] = useState("");
+  const [editStockQuantity, setEditStockQuantity] = useState("");
 
   const fetchPendingItems = useCallback(async () => {
     setLoading(true);
@@ -132,6 +141,50 @@ export default function MerchantApprovalsPage() {
     }
   };
 
+  const handleEditSave = async () => {
+    if (!editingId || !editingType) return;
+
+    let table = "";
+    let updates: any = {};
+
+    if (editingType === "merchants") {
+      table = "merchants";
+      if (!editMerchantName) return toast.error("Name required");
+      updates = { name: editMerchantName };
+    } else if (editingType === "products") {
+      table = "products";
+      if (!editProductName || !editProductPrice) return toast.error("Name and price required");
+      updates = { name: editProductName, price: Number(editProductPrice) };
+    } else if (editingType === "stock") {
+      table = "stock_entries";
+      if (!editStockQuantity) return toast.error("Quantity required");
+      updates = { quantity: Number(editStockQuantity) };
+    }
+
+    try {
+      const { error } = await supabase!.from(table).update(updates).eq("id", editingId);
+      if (error) throw error;
+      toast.success("Item updated");
+      setEditingId(null);
+      setEditingType(null);
+      fetchPendingItems();
+    } catch (err) {
+      toast.error("Failed to update item");
+    }
+  };
+
+  const handleDelete = async (table: string, itemId: string) => {
+    if (!confirm("Are you sure you want to completely delete this entry?")) return;
+    try {
+      const { error } = await supabase!.from(table).delete().eq("id", itemId);
+      if (error) throw error;
+      toast.success("Entry deleted");
+      fetchPendingItems();
+    } catch (err) {
+      toast.error("Failed to delete entry");
+    }
+  };
+
   const ApprovalBadge = ({
     admin,
     warehouse,
@@ -228,10 +281,21 @@ export default function MerchantApprovalsPage() {
                     key={merchant.id}
                     className="p-4 flex items-center justify-between border-0 shadow-sm"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        {merchant.name}
-                      </p>
+                    <div className="flex-1">
+                      {editingId === merchant.id && editingType === "merchants" ? (
+                        <div className="flex gap-2 items-center mb-1">
+                          <Input
+                            value={editMerchantName}
+                            onChange={(e) => setEditMerchantName(e.target.value)}
+                            className="h-8 max-w-[200px]"
+                            placeholder="Merchant Name"
+                          />
+                          <Button size="sm" onClick={handleEditSave}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-slate-900">{merchant.name}</p>
+                      )}
                       <p className="text-xs text-slate-400 mt-1">
                         Submitted by:{" "}
                         <span className="capitalize">
@@ -246,26 +310,48 @@ export default function MerchantApprovalsPage() {
                         />
                       </div>
                     </div>
-                    {canApprove(merchant) && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="icon-sm"
-                          variant="outline"
-                          className="text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => handleApprove("merchants", merchant)}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon-sm"
-                          variant="outline"
-                          className="text-red-600 hover:bg-red-50"
-                          onClick={() => handleReject("merchants", merchant.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 items-center flex-wrap justify-end pl-4">
+                      {canApprove(merchant) && (
+                        <>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            className="text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => handleApprove("merchants", merchant)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleReject("merchants", merchant.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="icon-sm"
+                        variant="outline"
+                        className="text-slate-600 hover:bg-slate-50"
+                        onClick={() => {
+                          setEditingId(merchant.id);
+                          setEditingType("merchants");
+                          setEditMerchantName(merchant.name);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="outline"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={() => handleDelete("merchants", merchant.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -288,36 +374,81 @@ export default function MerchantApprovalsPage() {
                   >
                     <div>
                       <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {product.name}
-                          </p>
-                          <p className="text-xs text-primary font-mono font-medium">
-                            ₦{Number(product.price).toLocaleString()}
-                          </p>
+                        <div className="flex-1">
+                          {editingId === product.id && editingType === "products" ? (
+                            <div className="flex gap-2 items-center mb-2 flex-wrap">
+                              <Input
+                                value={editProductName}
+                                onChange={(e) => setEditProductName(e.target.value)}
+                                className="h-8 max-w-[150px]"
+                                placeholder="Product Name"
+                              />
+                              <Input
+                                type="number"
+                                value={editProductPrice}
+                                onChange={(e) => setEditProductPrice(e.target.value)}
+                                className="h-8 w-24"
+                                placeholder="Price"
+                              />
+                              <Button size="sm" onClick={handleEditSave}>Save</Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-slate-900">
+                                {product.name}
+                              </p>
+                              <p className="text-xs text-primary font-mono font-medium">
+                                ₦{Number(product.price).toLocaleString()}
+                              </p>
+                            </>
+                          )}
                         </div>
-                        {canApprove(product) && (
-                          <div className="flex gap-1">
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                              onClick={() => handleApprove("products", product)}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                              onClick={() =>
-                                handleReject("products", product.id)
-                              }
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex gap-1 pl-2">
+                          {canApprove(product) && (
+                            <>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                onClick={() => handleApprove("products", product)}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                onClick={() =>
+                                  handleReject("products", product.id)
+                                }
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="text-slate-600 hover:bg-slate-50"
+                            onClick={() => {
+                              setEditingId(product.id);
+                              setEditingType("products");
+                              setEditProductName(product.name);
+                              setEditProductPrice(product.price);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDelete("products", product.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-500 mt-2">
                         Merchant: {product.merchants?.name}
@@ -373,9 +504,22 @@ export default function MerchantApprovalsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Quantity</p>
-                        <p className="text-sm font-bold text-primary">
-                          +{entry.quantity}
-                        </p>
+                        {editingId === entry.id && editingType === "stock" ? (
+                          <div className="flex gap-2 items-center mt-1">
+                            <Input
+                              type="number"
+                              value={editStockQuantity}
+                              onChange={(e) => setEditStockQuantity(e.target.value)}
+                              className="h-8 w-20"
+                            />
+                            <Button size="icon-sm" onClick={handleEditSave}><Check className="h-3 w-3" /></Button>
+                            <Button size="icon-sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3 w-3" /></Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-primary">
+                            +{entry.quantity}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Submitted By</p>
@@ -390,30 +534,52 @@ export default function MerchantApprovalsPage() {
                         warehouse={entry.warehouse_approved}
                         customerService={entry.customer_service_approved}
                       />
-                      {canApprove(entry) && (
-                        <div className="flex gap-2 pl-4 border-l">
-                          <Button
-                            size="icon-sm"
-                            variant="outline"
-                            className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                            onClick={() =>
-                              handleApprove("stock_entries", entry)
-                            }
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon-sm"
-                            variant="outline"
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                            onClick={() =>
-                              handleReject("stock_entries", entry.id)
-                            }
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex gap-2 pl-4 border-l items-center flex-wrap">
+                        {canApprove(entry) && (
+                          <>
+                            <Button
+                              size="icon-sm"
+                              variant="outline"
+                              className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                              onClick={() =>
+                                handleApprove("stock_entries", entry)
+                              }
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="outline"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() =>
+                                handleReject("stock_entries", entry.id)
+                              }
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="text-slate-600 hover:bg-slate-50"
+                          onClick={() => {
+                            setEditingId(entry.id);
+                            setEditingType("stock");
+                            setEditStockQuantity(entry.quantity);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="outline"
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => handleDelete("stock_entries", entry.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}

@@ -111,6 +111,13 @@ export default function FOMOrdersPage() {
     fetchOrders();
   }, [user?.uid]);
 
+  useEffect(() => {
+    console.log(
+      "deliver status",
+      editForm?.fom_delivery_status?.toLowerCase() === "delivered",
+    );
+  }, [editForm]);
+
   useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
     user?.uid,
   ]);
