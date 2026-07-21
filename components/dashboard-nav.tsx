@@ -166,6 +166,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           icon: TrendingUp,
         },
         {
+          label: "Rider Payments",
+          href: `/dashboard/${user.role}/rider-payments`,
+          icon: Bike,
+        },
+        {
           label: "Users",
           href: `/dashboard/${user.role}/users`,
           icon: Users,
