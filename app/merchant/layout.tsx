@@ -70,7 +70,7 @@ function MerchantLayoutContent({ children }: { children: React.ReactNode }) {
       label: "Stock Count",
       href: "/merchant/stock-count",
       icon: BarChart3,
-      roles: ["admin", "warehouse", "guest"],
+      roles: ["admin", "warehouse", "customer_service", "guest"],
     },
     {
       label: "Pending Approvals",
