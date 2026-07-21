@@ -45,6 +45,7 @@ const STATUS_STYLES: Record<string, string> = {
   delivered: "bg-emerald-100 text-emerald-900",
   cancelled: "bg-slate-100 text-slate-900",
   returned: "bg-orange-100 text-orange-900",
+  failed: "bg-red-100 text-red-900",
 };
 
 export default function OrdersPage() {
@@ -498,9 +499,11 @@ export default function OrdersPage() {
             Review customer orders and track their workflow across the system.
           </p>{" "}
           <div className="flex flex-wrap gap-2 mt-4">
-            <ExportButton 
-              disabled={loading || orders.length === 0} 
-              onExport={async (start, end, type) => await handleExport(fomUsers, ccUsers, type, start, end)} 
+            <ExportButton
+              disabled={loading || orders.length === 0}
+              onExport={async (start, end, type) =>
+                await handleExport(fomUsers, ccUsers, type, start, end)
+              }
             />
           </div>
         </div>

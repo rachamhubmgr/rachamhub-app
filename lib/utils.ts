@@ -34,13 +34,16 @@ const getOrders = async (startDate?: Date, endDate?: Date) => {
     ascending: false,
   });
 
-  return { data, fetchError };
+  const { data: landmarksData } = await supabase!.from("landmarks").select("*");
+
+  return { data, fetchError, landmarks: landmarksData || [] };
 };
 
 export const prepareExportData = (
   orders: Order[],
   fomUsers: any[] = [],
   ccUsers: any[] = [],
+  landmarks: any[] = [],
 ) => {
   const headers = [
     "Order ID",
@@ -60,6 +63,7 @@ export const prepareExportData = (
     "Rider Assigned At",
     "FOM Status",
     "Landmark",
+    "Landmark Price",
     "Payment Method",
     "Bank",
     "Quantity Delivered",
@@ -78,6 +82,8 @@ export const prepareExportData = (
     const ccUser = ccUsers.find((u) => u.id === order.extracted_by);
     const riderPrice = Number((order as any).payment_to_rider || 0);
     const total = Number(order.total_amount || 0);
+    const landmarkRecord = landmarks.find((l) => l.name === (order as any).landmark);
+    const landmarkPrice = Number(landmarkRecord?.price || 0);
 
     return [
       `${order.id.split("-")[0]}`,
@@ -97,6 +103,7 @@ export const prepareExportData = (
       formatDateDisplay(new Date(order.rider_assigned_at)),
       order.fom_delivery_status || "",
       (order as any).landmark || "",
+      landmarkPrice.toFixed(2),
       (order as any).payment_method || "",
       (order as any).bank || "",
       (order as any).quantity_delivered || "",
@@ -118,8 +125,9 @@ export const buildCsv = (
   orders: Order[],
   fomUsers: any[] = [],
   ccUsers: any[] = [],
+  landmarks: any[] = [],
 ) => {
-  const { headers, rows } = prepareExportData(orders, fomUsers, ccUsers);
+  const { headers, rows } = prepareExportData(orders, fomUsers, ccUsers, landmarks);
   const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
   return [headers, ...rows]
@@ -134,9 +142,9 @@ export const handleExport = async (
   startDate?: Date,
   endDate?: Date,
 ) => {
-  const { data: orders } = await getOrders(startDate, endDate);
+  const { data: orders, landmarks } = await getOrders(startDate, endDate);
   if (type === "xlsx") {
-    const { headers, rows } = prepareExportData(orders!, fomUsers, ccUsers);
+    const { headers, rows } = prepareExportData(orders!, fomUsers, ccUsers, landmarks);
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
@@ -147,7 +155,7 @@ export const handleExport = async (
     return;
   }
 
-  const csv = buildCsv(orders!, fomUsers, ccUsers);
+  const csv = buildCsv(orders!, fomUsers, ccUsers, landmarks);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

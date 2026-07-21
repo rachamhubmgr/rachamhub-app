@@ -23,8 +23,20 @@ import { Label } from "@/components/ui/label";
 import { buildCsv, cn, formatDateDisplay, handleExport } from "@/lib/utils";
 import { ExportButton } from "@/components/export-button";
 
-const formatCurrency = (value: number) =>
-  `₦${Number(value || 0).toLocaleString()}`;
+const formatCurrency = (value: number) => {
+  const num = Number(value || 0);
+  const absNum = Math.abs(num);
+  
+  if (absNum >= 1e9) {
+    const formatted = parseFloat((num / 1e9).toFixed(2));
+    return `₦${formatted}B`;
+  } else if (absNum >= 1e6) {
+    const formatted = parseFloat((num / 1e6).toFixed(2));
+    return `₦${formatted}M`;
+  }
+  
+  return `₦${num.toLocaleString()}`;
+};
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);

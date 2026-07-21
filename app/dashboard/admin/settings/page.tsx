@@ -39,6 +39,7 @@ export default function AdminSettingsPage() {
   const [newMerchant, setNewMerchant] = useState("");
   const [newRider, setNewRider] = useState("");
   const [newRiderPhone, setNewRiderPhone] = useState("");
+  const [newRiderType, setNewRiderType] = useState("external");
   const [newLandmark, setNewLandmark] = useState("");
   const [newLandmarkPrice, setNewLandmarkPrice] = useState("");
   const [settings, setSettings] = useState({
@@ -56,6 +57,7 @@ export default function AdminSettingsPage() {
   const [editingRiderId, setEditingRiderId] = useState<string | null>(null);
   const [editRiderName, setEditRiderName] = useState("");
   const [editRiderPhone, setEditRiderPhone] = useState("");
+  const [editRiderType, setEditRiderType] = useState("external");
 
   const [editingLandmarkId, setEditingLandmarkId] = useState<string | null>(
     null,
@@ -242,7 +244,7 @@ export default function AdminSettingsPage() {
     }
     const { error } = await supabase!
       .from("riders")
-      .insert([{ name: newRider, phone: newRiderPhone }]);
+      .insert([{ name: newRider, phone: newRiderPhone, rider_type: newRiderType }]);
     if (error) toast.error("Failed to add rider");
     else {
       toast.success("Rider added");
@@ -265,7 +267,7 @@ export default function AdminSettingsPage() {
     if (!editRiderName || !editRiderPhone) return;
     const { error } = await supabase!
       .from("riders")
-      .update({ name: editRiderName, phone: editRiderPhone })
+      .update({ name: editRiderName, phone: editRiderPhone, rider_type: editRiderType })
       .eq("id", id);
     if (error) toast.error("Failed to update rider");
     else {
@@ -386,7 +388,7 @@ export default function AdminSettingsPage() {
             placeholder="Filter riders by name or phone..."
             title="Find Rider"
           />
-          <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-border">
+          <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-border flex-wrap">
             <Input
               placeholder="Rider Name..."
               value={newRider}
@@ -399,6 +401,14 @@ export default function AdminSettingsPage() {
               onChange={(e) => setNewRiderPhone(e.target.value)}
               className="max-w-xs"
             />
+            <select
+              value={newRiderType}
+              onChange={(e) => setNewRiderType(e.target.value)}
+              className="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="external">External</option>
+              <option value="in-house">In-House</option>
+            </select>
             <Button onClick={handleAddRider} className="gap-2">
               <Plus className="h-4 w-4" /> Add Rider
             </Button>
@@ -410,7 +420,7 @@ export default function AdminSettingsPage() {
                 key={r.id}
                 className="flex items-center justify-between p-4 border rounded-xl bg-white hover:bg-muted/5 transition-colors"
               >
-                <div className="flex gap-8 flex-1">
+                <div className="flex gap-8 flex-1 items-center">
                   {editingRiderId === r.id ? (
                     <>
                       <Input
@@ -423,6 +433,14 @@ export default function AdminSettingsPage() {
                         onChange={(e) => setEditRiderPhone(e.target.value)}
                         className="h-8 max-w-xs"
                       />
+                      <select
+                        value={editRiderType}
+                        onChange={(e) => setEditRiderType(e.target.value)}
+                        className="flex h-8 w-32 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="external">External</option>
+                        <option value="in-house">In-House</option>
+                      </select>
                     </>
                   ) : (
                     <>
@@ -431,7 +449,10 @@ export default function AdminSettingsPage() {
                       >
                         {r.name}
                       </p>
-                      <p className="text-sm text-muted-foreground">{r.phone}</p>
+                      <p className="text-sm text-muted-foreground w-32">{r.phone}</p>
+                      <span className="px-2 py-0.5 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                        {r.rider_type || "external"}
+                      </span>
                     </>
                   )}
                 </div>
@@ -462,6 +483,7 @@ export default function AdminSettingsPage() {
                           setEditingRiderId(r.id);
                           setEditRiderName(r.name);
                           setEditRiderPhone(r.phone);
+                          setEditRiderType(r.rider_type || "external");
                         }}
                       >
                         <Edit2 className="h-4 w-4" />

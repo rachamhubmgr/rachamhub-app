@@ -25,11 +25,13 @@ interface RiderEntry {
   }>;
   totalPay: number;
   outstanding: number;
+  rider_type?: string;
 }
 
 export default function RiderPaymentsPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
+  const [ridersList, setRidersList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState(() => {
     const today = new Date();
@@ -139,7 +141,10 @@ export default function RiderPaymentsPage() {
 
       if (error) throw error;
       setOrders(data || []);
-      console.log(data || []);
+      
+      const { data: ridersData } = await supabase!.from("riders").select("*");
+      if (ridersData) setRidersList(ridersData);
+      
     } catch (err) {
       toast.error("Failed to load rider data");
     } finally {
@@ -157,8 +162,10 @@ export default function RiderPaymentsPage() {
     for (const order of orders) {
       const rider = order.rider_name || "Unknown";
       if (!map[rider]) {
+        const foundRider = ridersList.find(r => r.name === rider);
         map[rider] = {
           rider,
+          rider_type: foundRider?.rider_type || "external",
           deliveries: [],
           totalPay: 0,
           outstanding: outstandingMap[rider] || 0,
@@ -188,7 +195,7 @@ export default function RiderPaymentsPage() {
       ...entry,
       outstanding: outstandingMap[entry.rider] || 0,
     }));
-  }, [orders, outstandingMap]);
+  }, [orders, outstandingMap, ridersList]);
 
   const grandTotal = useMemo(
     () => riderGroups.reduce((s, r) => s + r.totalPay - r.outstanding, 0),
@@ -306,9 +313,16 @@ export default function RiderPaymentsPage() {
                 return (
                   <Card key={entry.rider} className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-bold text-foreground">
-                        {entry.rider}
-                      </h2>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-lg font-bold text-foreground">
+                          {entry.rider}
+                        </h2>
+                        {entry.rider_type === "in-house" && (
+                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                            In-House
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">

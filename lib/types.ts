@@ -20,7 +20,8 @@ export type OrderStatus =
   | "shipped"
   | "returned"
   | "delivered"
-  | "cancelled";
+  | "cancelled"
+  | "failed";
 
 // Firestore user document structure
 export interface UserProfile {
