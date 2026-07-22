@@ -337,17 +337,8 @@ export default function InventoryPage() {
     if (!editForm) return;
 
     const originalOrder = orders.find((order) => order.id === editForm.id);
-    const originalWarehouseStatus = String(
-      (originalOrder as any)?.warehouse_status || "",
-    ).toLowerCase();
-    const nextWarehouseStatus = String(
-      (editForm as any).warehouse_status || "",
-    ).toLowerCase();
-    const isMarkingOutOfStock =
-      nextWarehouseStatus === "out-of-stock" &&
-      originalWarehouseStatus !== "out-of-stock";
 
-    if (isMarkingOutOfStock && !warehouseKeyModalOpen) {
+    if (!warehouseKeyModalOpen) {
       setWarehouseKeyModalOpen(true);
       return;
     }
@@ -356,13 +347,11 @@ export default function InventoryPage() {
     setError(null);
 
     try {
-      if (isMarkingOutOfStock) {
-        const isValidKey = await verifyWarehouseAccessKey();
-        if (!isValidKey) {
-          toast.error("Invalid warehouse merchant dashboard access key.");
-          setIsSaving(false);
-          return;
-        }
+      const isValidKey = await verifyWarehouseAccessKey();
+      if (!isValidKey) {
+        toast.error("Invalid warehouse access key.");
+        setIsSaving(false);
+        return;
       }
 
       const { error: updateError } = await supabase!

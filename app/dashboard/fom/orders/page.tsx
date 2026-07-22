@@ -248,6 +248,14 @@ export default function FOMOrdersPage() {
           ((row.items as any[]) || []).map((i) => i.name).join(", "),
       },
       {
+        key: "order_price",
+        label: "TOtal Amount (₦)",
+        render: (row) =>
+          `₦${Number((row as any).total_amount || 0).toLocaleString()}`,
+        getSearchableText: (row) =>
+          String(Number((row as any).total_amount || 0)),
+      },
+      {
         key: "rider_info",
         label: "Rider / Landmark",
         render: (row) => (
