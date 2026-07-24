@@ -26,7 +26,7 @@ import { ExportButton } from "@/components/export-button";
 const formatCurrency = (value: number) => {
   const num = Number(value || 0);
   const absNum = Math.abs(num);
-  
+
   if (absNum >= 1e9) {
     const formatted = parseFloat((num / 1e9).toFixed(2));
     return `₦${formatted}B`;
@@ -34,7 +34,7 @@ const formatCurrency = (value: number) => {
     const formatted = parseFloat((num / 1e6).toFixed(2));
     return `₦${formatted}M`;
   }
-  
+
   return `₦${num.toLocaleString()}`;
 };
 
@@ -54,6 +54,9 @@ export default function AdminOrdersPage() {
   const [landmarks, setLandmarks] = useState<any[]>([]);
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [editedFields, setEditedFields] = useState<Set<string>>(new Set());
+
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   // Modal states for long text fields
   const [modalOpen, setModalOpen] = useState(false);
@@ -130,10 +133,12 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
-    startDate,
-    endDate,
-  ]);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [startDate, endDate],
+    realtimePaused,
+  );
 
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
@@ -632,9 +637,8 @@ export default function AdminOrdersPage() {
           );
         },
         getSearchableText: (row) =>
-          `${
-            fomUsers.find((u) => u.id === (row as any).fom_assigned)
-              ?.display_name
+          `${fomUsers.find((u) => u.id === (row as any).fom_assigned)
+            ?.display_name
           } ${(row as any).rider_name} ${new Date(
             (row as any).rider_assigned_at,
           ).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`,
@@ -830,9 +834,8 @@ export default function AdminOrdersPage() {
           </div>
         ),
         getSearchableText: (row) =>
-          `${
-            ccUsers.find((u) => u.id === (row.extracted_by as any))
-              ?.display_name
+          `${ccUsers.find((u) => u.id === (row.extracted_by as any))
+            ?.display_name
           }`,
       },
     ],
@@ -1058,6 +1061,7 @@ export default function AdminOrdersPage() {
             searchPlaceholder="Search system-wide orders..."
             showActions
             renderRowActions={renderRowActions}
+            onUserActivityChange={setRealtimePaused}
           />
         </Card>
       )}

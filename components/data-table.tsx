@@ -84,6 +84,13 @@ interface DataTableProps {
   merchantOptions?: string[];
   filterMerchant?: string | null;
   onFilterMerchantChange?: (v: string | null) => void;
+  /**
+   * Called with `true` when the user starts editing a row or types into the
+   * search / filter box, and `false` when they finish (save, cancel, clear).
+   * Use this to temporarily pause realtime subscriptions while the table is
+   * being interacted with, then resume once they are done.
+   */
+  onUserActivityChange?: (active: boolean) => void;
 }
 
 type DialogContext = {
@@ -175,6 +182,7 @@ export default function DataTable({
   filterMerchant = null,
   onFilterMerchantChange = () => {},
   renderRowActions,
+  onUserActivityChange,
 }: DataTableProps) {
   const columns = useMemo(() => headers.map(normalizeColumn), [headers]);
   const serialColumnWidth = "64px";
@@ -183,6 +191,7 @@ export default function DataTable({
   const [searchText, setSearchText] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<DataTableRow | null>(null);
+  const [manualRealtimeEnabled, setManualRealtimeEnabled] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topDummyScrollRef = useRef<HTMLDivElement>(null);
   const [contentWidth, setContentWidth] = useState(0);
@@ -253,6 +262,21 @@ export default function DataTable({
   }, [rows]);
 
   useEffect(() => {
+    const hasActivity =
+      editingIndex !== null ||
+      searchText.trim().length > 0 ||
+      filterMerchant !== null;
+    const shouldPause = hasActivity || !manualRealtimeEnabled;
+    onUserActivityChange?.(shouldPause);
+  }, [
+    editingIndex,
+    searchText,
+    filterMerchant,
+    manualRealtimeEnabled,
+    onUserActivityChange,
+  ]);
+
+  useEffect(() => {
     setColumnWidths(
       Object.fromEntries(
         columns.map((column) => [
@@ -292,6 +316,8 @@ export default function DataTable({
       makeSearchString(row, columns).includes(query),
     );
   }, [columns, searchText, tableRows]);
+
+  // ---------- activity-aware edit / search helpers ----------
 
   const startEditing = (index: number) => {
     setEditingIndex(index);
@@ -349,6 +375,14 @@ export default function DataTable({
 
   const handleCellChange = (columnKey: string, value: DataTableCellValue) => {
     setEditRow((prev) => (prev ? { ...prev, [columnKey]: value } : prev));
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchText(value);
+  };
+
+  const handleMerchantFilterChange = (value: string | null) => {
+    onFilterMerchantChange(value);
   };
 
   const renderCellContent = (
@@ -452,10 +486,14 @@ export default function DataTable({
       {!disableSearch ? (
         <OrderSearchFilter
           searchTerm={searchText}
-          onSearchTermChange={setSearchText}
+          onSearchTermChange={handleSearchChange}
           merchantOptions={merchantOptions}
           filterMerchant={filterMerchant}
-          onFilterMerchantChange={onFilterMerchantChange}
+          onFilterMerchantChange={handleMerchantFilterChange}
+          realtimeEnabled={manualRealtimeEnabled}
+          onRealtimeToggle={
+            onUserActivityChange ? setManualRealtimeEnabled : undefined
+          }
         />
       ) : null}
 

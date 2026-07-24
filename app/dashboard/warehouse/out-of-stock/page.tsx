@@ -48,6 +48,8 @@ export default function OutOfStockPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
@@ -304,7 +306,12 @@ export default function OutOfStockPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [],
+    realtimePaused,
+  );
 
   const actionableOrders = useMemo(
     () =>
@@ -420,6 +427,7 @@ export default function OutOfStockPage() {
             onFilterMerchantChange={setFilterMerchant}
             showActions
             renderRowActions={renderRowActions}
+            onUserActivityChange={setRealtimePaused}
           />
         </div>
       </Card>

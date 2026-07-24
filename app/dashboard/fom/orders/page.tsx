@@ -49,6 +49,8 @@ export default function FOMOrdersPage() {
   const [editForm, setEditForm] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     if (!user?.uid) return;
@@ -111,16 +113,12 @@ export default function FOMOrdersPage() {
     fetchOrders();
   }, [user?.uid]);
 
-  useEffect(() => {
-    console.log(
-      "deliver status",
-      editForm?.fom_delivery_status?.toLowerCase() === "delivered",
-    );
-  }, [editForm]);
-
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, [
-    user?.uid,
-  ]);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [user?.uid],
+    realtimePaused,
+  );
 
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
@@ -575,6 +573,7 @@ export default function FOMOrdersPage() {
             searchPlaceholder="Search my orders..."
             showActions
             renderRowActions={renderRowActions}
+            onUserActivityChange={setRealtimePaused}
           />
         )}
       </Card>

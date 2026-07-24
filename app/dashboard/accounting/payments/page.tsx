@@ -21,6 +21,8 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Pause realtime while the user is searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -207,7 +209,12 @@ export default function PaymentsPage() {
     },
   ];
 
-  useSupabaseRealtime([{ table: "landmarks", event: "*" }], fetchData, []);
+  useSupabaseRealtime(
+    [{ table: "landmarks", event: "*" }],
+    fetchData,
+    [],
+    realtimePaused,
+  );
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -263,6 +270,7 @@ export default function PaymentsPage() {
             merchantOptions={[]}
             filterMerchant={filterMerchant}
             onFilterMerchantChange={setFilterMerchant}
+            onUserActivityChange={setRealtimePaused}
           />
         </Card>
       )}

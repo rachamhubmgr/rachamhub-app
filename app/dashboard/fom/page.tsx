@@ -54,6 +54,8 @@ export default function FOMDashboard() {
   >(null);
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user?.uid) return;
@@ -110,9 +112,12 @@ export default function FOMDashboard() {
     fetchData();
   }, [user?.uid]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, [
-    user?.uid,
-  ]);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchData,
+    [user?.uid],
+    realtimePaused,
+  );
 
   const updateRowInput = useCallback(
     (orderId: string, field: string, value: any) => {
@@ -565,6 +570,7 @@ export default function FOMDashboard() {
           searchPlaceholder="Search queue..."
           showActions
           renderRowActions={renderRowActions}
+          onUserActivityChange={setRealtimePaused}
         />
       </Card>
 

@@ -153,6 +153,11 @@ export default function DashboardNav({ className }: DashboardNavProps) {
           href: `/dashboard/${user.role}/payments`,
           icon: DollarSign,
         },
+        {
+          label: "Rider Payments",
+          href: `/dashboard/${user.role}/rider-payments`,
+          icon: Bike,
+        },
       ],
       admin: [
         {

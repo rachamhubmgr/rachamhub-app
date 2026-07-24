@@ -23,6 +23,8 @@ export default function InvoicesPage() {
   const [verifications, setVerifications] = useState<
     Record<string, { confirmed: string; bank: string }>
   >({});
+  // Pause realtime while the user is searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -69,7 +71,12 @@ export default function InvoicesPage() {
     fetchData();
   }, []);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchData, []);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchData,
+    [],
+    realtimePaused,
+  );
 
   const updateVerify = useCallback(
     (id: string, field: "confirmed" | "bank", value: string) => {
@@ -391,6 +398,7 @@ export default function InvoicesPage() {
             filterMerchant={filterMerchant}
             onFilterMerchantChange={setFilterMerchant}
             searchPlaceholder="Search invoices..."
+            onUserActivityChange={setRealtimePaused}
           />
         </Card>
       )}

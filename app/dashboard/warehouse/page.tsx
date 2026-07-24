@@ -55,6 +55,8 @@ export default function WarehouseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -338,7 +340,12 @@ export default function WarehouseOrdersPage() {
     [editingId, editForm, fomUsers, ccUsers, openCommentModal],
   );
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [],
+    realtimePaused,
+  );
 
   const handleSave = useCallback(async () => {
     if (!editForm || !supabase) return;
@@ -537,6 +544,7 @@ export default function WarehouseOrdersPage() {
               onFilterMerchantChange={setFilterMerchant}
               showActions
               renderRowActions={renderRowActions}
+              onUserActivityChange={setRealtimePaused}
             />
           </div>
         )}

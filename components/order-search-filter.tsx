@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Switch } from "@/components/ui/switch";
 
 interface Props {
   searchTerm: string;
@@ -10,6 +11,8 @@ interface Props {
   onFilterMerchantChange?: (v: string | null) => void;
   placeholder?: string;
   title?: string;
+  realtimeEnabled?: boolean;
+  onRealtimeToggle?: (enabled: boolean) => void;
 }
 
 export default function OrderSearchFilter({
@@ -20,6 +23,8 @@ export default function OrderSearchFilter({
   onFilterMerchantChange,
   placeholder = "Search by customer, address, order id or merchant",
   title = "Search & Filter",
+  realtimeEnabled,
+  onRealtimeToggle,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -48,6 +53,18 @@ export default function OrderSearchFilter({
             </option>
           ))}
         </select>
+      )}
+      {onRealtimeToggle && (
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Realtime Updates
+          </span>
+          <Switch
+            checked={realtimeEnabled}
+            onCheckedChange={onRealtimeToggle}
+            aria-label="Toggle realtime updates"
+          />
+        </div>
       )}
     </div>
   );

@@ -52,6 +52,8 @@ export default function InventoryPage() {
   const [warehouseKeyModalOpen, setWarehouseKeyModalOpen] = useState(false);
   const [warehouseAccessKey, setWarehouseAccessKey] = useState("");
   const { user } = useAuth();
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const startEditing = useCallback((order: Order) => {
     setEditingId(order.id);
@@ -210,7 +212,7 @@ export default function InventoryPage() {
               fomUsers.find((user) => user.id === (row as any).fom_assigned)
                 ?.display_name || "—"
             );
-          return !((row as any).rider_name) ? (
+          return !(row as any).rider_name ? (
             <select
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-[11px]"
               value={(editForm as any)?.fom_assigned || ""}
@@ -256,6 +258,28 @@ export default function InventoryPage() {
             (row as any).warehouse_comment || "—"
           ),
         getSearchableText: (row) => (row as any).warehouse_comment || "",
+      },
+      {
+        key: "cc_comment",
+        label: "CS Comment",
+        longText: true,
+        render: (row) =>
+          editingId === String(row.id) ? (
+            <Input
+              className="h-8 text-xs cursor-pointer"
+              readOnly
+              onClick={() =>
+                openCommentModal(
+                  String(row.id),
+                  (editForm as any)?.cc_comment || "",
+                )
+              }
+              value={(editForm as any)?.cc_comment || "—"}
+            />
+          ) : (
+            (row as any).cc_comment || "—"
+          ),
+        getSearchableText: (row) => (row as any).cc_comment || "",
       },
     ],
     [editingId, editForm, fomUsers, openCommentModal],
@@ -379,7 +403,12 @@ export default function InventoryPage() {
     }
   }, [editForm, orders, verifyWarehouseAccessKey, warehouseKeyModalOpen]);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [],
+    realtimePaused,
+  );
 
   useEffect(() => {
     fetchOrders();
@@ -503,6 +532,7 @@ export default function InventoryPage() {
             onFilterMerchantChange={setFilterMerchant}
             showActions
             renderRowActions={renderRowActions}
+            onUserActivityChange={setRealtimePaused}
           />
         </div>
       </Card>

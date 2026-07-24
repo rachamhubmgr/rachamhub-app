@@ -61,6 +61,8 @@ export default function OrdersPage() {
   const [merchantOptions, setMerchantOptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMerchant, setFilterMerchant] = useState<string | null>(null);
+  // Pause realtime while the user is editing a row, searching or filtering
+  const [realtimePaused, setRealtimePaused] = useState(false);
 
   const [modalField, setModalField] = useState<
     | "customer_name"
@@ -126,7 +128,12 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
-  useSupabaseRealtime([{ table: "orders", event: "*" }], fetchOrders, []);
+  useSupabaseRealtime(
+    [{ table: "orders", event: "*" }],
+    fetchOrders,
+    [],
+    realtimePaused,
+  );
 
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -570,6 +577,7 @@ export default function OrdersPage() {
                 </div>
               );
             }}
+            onUserActivityChange={setRealtimePaused}
           />
         </Card>
       )}
