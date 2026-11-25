@@ -356,6 +356,7 @@ export default function DataTable({
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 48,
     overscan: 10,
+    useFlushSync: false,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const totalVirtualHeight = rowVirtualizer.getTotalSize();

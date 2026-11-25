@@ -81,6 +81,7 @@ export default function MerchantBreakdownPage() {
 
       if (error) throw error;
       setOrders(data);
+      console.log(data);
       setOrders((data ?? []) as BreakdownOrder[]);
     } catch {
       toast.error("Failed to load orders for the selected date.");
@@ -497,10 +498,10 @@ export default function MerchantBreakdownPage() {
                       <tr
                         key={order.id}
                         className={`border-t border-border ${isFailed
-                            ? "bg-red-50"
-                            : isDelivered
-                              ? "bg-emerald-50/30"
-                              : ""
+                          ? "bg-red-50"
+                          : isDelivered
+                            ? "bg-emerald-50/30"
+                            : ""
                           }`}
                       >
                         <td className="p-3 font-medium">
@@ -526,10 +527,10 @@ export default function MerchantBreakdownPage() {
                         <td className="p-3">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${isDelivered
-                                ? "bg-emerald-100 text-emerald-700"
-                                : isFailed
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-amber-100 text-amber-700"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : isFailed
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
                               }`}
                           >
                             {order.fom_delivery_status ||

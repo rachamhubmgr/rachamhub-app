@@ -114,7 +114,8 @@ export default function InvoicesPage() {
         (() => {
           let q = ordersQuery
             .or("status.eq.fom,status.eq.accounting")
-            .neq("rider_name", null);
+            .neq("rider_name", null)
+            .neq("payment_confirmed", true);
           if (filterMerchant) q = q.eq("merchant", filterMerchant);
           return q.order(dateField, { ascending: false, nullsFirst: false }).range(0, PAGE_SIZE - 1);
         })(),
