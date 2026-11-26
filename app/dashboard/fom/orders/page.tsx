@@ -209,15 +209,9 @@ export default function FOMOrdersPage() {
         : 0;
 
     const originalOrder = orders.find((o) => o.id === editForm.id);
-    const wasAlreadyDelivered =
-      originalOrder?.fom_delivery_status?.toLowerCase() === "delivered" ||
-      !!originalOrder?.delivered_at;
 
-    const finalStatuses = ["delivered", "failed", "returned", "canceled"];
-    const isNowFinal = finalStatuses.includes(editForm.fom_delivery_status?.toLowerCase() || "");
-    const wasAlreadyFinal = finalStatuses.includes(originalOrder?.fom_delivery_status?.toLowerCase() || "") || !!originalOrder?.delivered_at;
-
-    const isNewlyFinal = isNowFinal && !wasAlreadyFinal;
+    const isDelivered =
+      editForm.fom_delivery_status?.toLowerCase() === "delivered";
 
     const isNewlyFailed =
       editForm.fom_delivery_status?.toLowerCase() === "failed" &&
@@ -234,6 +228,12 @@ export default function FOMOrdersPage() {
       paymentToRiderPayload = { payment_to_rider: Number(originalOrder?.payment_to_rider || 0) * 2 };
     }
 
+    // delivered_at must ONLY be set when status is 'delivered'.
+    // If status is changed away from 'delivered' (e.g. failed, returned, canceled, pending), it must be cleared to null.
+    const deliveredAt = isDelivered
+      ? (originalOrder?.delivered_at || new Date().toISOString())
+      : null;
+
     setIsSaving(true);
     setError(null);
 
@@ -249,8 +249,8 @@ export default function FOMOrdersPage() {
           fom_comment: editForm.fom_comment,
           payment_to_merchant: paymentToMerchant,
           updated_at: new Date().toISOString(),
+          delivered_at: deliveredAt,
           ...paymentToRiderPayload,
-          ...(isNewlyFinal ? { delivered_at: new Date().toISOString() } : {}),
         })
         .eq("id", editForm.id);
 

@@ -113,9 +113,9 @@ export default function InvoicesPage() {
       ] = await Promise.all([
         (() => {
           let q = ordersQuery
-            .or("status.eq.fom,status.eq.accounting")
-            .neq("rider_name", null)
-            .neq("payment_confirmed", true);
+            .eq("fom_delivery_status", "delivered")
+            .eq("payment_confirmed", false)
+            .neq("rider_name", null);
           if (filterMerchant) q = q.eq("merchant", filterMerchant);
           return q.order(dateField, { ascending: false, nullsFirst: false }).range(0, PAGE_SIZE - 1);
         })(),
